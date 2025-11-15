@@ -20,7 +20,7 @@ import androidx.navigation.navArgument
 import com.example.appmovilfitquality.data.local.AppDataBase
 import com.example.appmovilfitquality.data.localstore.SessionManager
 import com.example.appmovilfitquality.data.repository.AuthRepository
-import com.example.appmovilfitquality.data.repository.DeliveryRepository
+import com.example.appmovilfitquality.data.repository.OrderRepository
 import com.example.appmovilfitquality.data.repository.ProductRepository
 import com.example.appmovilfitquality.ui.screen.AppHostScreen
 import com.example.appmovilfitquality.ui.screen.CartScreen
@@ -28,6 +28,7 @@ import com.example.appmovilfitquality.ui.screen.ChatSupportScreen
 import com.example.appmovilfitquality.ui.screen.DeliveryScreen
 import com.example.appmovilfitquality.ui.screen.HomeScreen
 import com.example.appmovilfitquality.ui.screen.LoginScreen
+import com.example.appmovilfitquality.ui.screen.OrderHistoryScreen
 import com.example.appmovilfitquality.ui.screen.RegisterScreen
 import com.example.appmovilfitquality.ui.screen.StockChatListScreen
 import com.example.appmovilfitquality.ui.screen.StockChatScreen
@@ -38,6 +39,7 @@ import com.example.appmovilfitquality.viewmodel.CartViewModel
 import com.example.appmovilfitquality.viewmodel.ChatViewModel
 import com.example.appmovilfitquality.viewmodel.CheckoutViewModel
 import com.example.appmovilfitquality.viewmodel.DeliveryViewModel
+import com.example.appmovilfitquality.viewmodel.HistoryViewModel
 import com.example.appmovilfitquality.viewmodel.StoreViewModel
 
 object Routes {
@@ -50,6 +52,10 @@ object Routes {
     const val STORE_CLIENT_HOME = "client_store_home"
     const val STOCK_MANAGER_HOME = "stock_home"
     const val DELIVERY_HOME = "delivery_home"
+
+    // Historial
+    const val CLIENT_ORDER_HISTORY = "client_order_history"
+    const val STOCK_SALES_HISTORY = "stock_sales_history"
 
     // Chat
     const val CLIENT_SUPPORT = "client_support"
@@ -67,7 +73,10 @@ fun NavGraph(navController: NavHostController) {
 
     val authRepository = remember { AuthRepository(appDatabase.userDao()) }
     val productRepository = remember { ProductRepository(appDatabase.productDao()) }
-    val deliveryRepository = remember { DeliveryRepository(appDatabase.orderDao()) }
+
+    val orderRepository = remember {
+        OrderRepository(appDatabase.orderDao(), appDatabase.orderItemDao())
+    }
 
     // ViewModels con Factory
     val authViewModel: AuthViewModel = viewModel(factory = object : ViewModelProvider.Factory {
@@ -94,23 +103,35 @@ fun NavGraph(navController: NavHostController) {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(DeliveryViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return DeliveryViewModel(deliveryRepository) as T
+                return DeliveryViewModel(orderRepository) as T
             }
             throw IllegalArgumentException("Unknown DeliveryViewModel class")
         }
     })
 
+    // CheckoutViewModel ahora usa ProductRepository
     val checkoutViewModel: CheckoutViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(CheckoutViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return CheckoutViewModel(deliveryRepository, authRepository, sessionManager) as T
+                return CheckoutViewModel(orderRepository, authRepository, sessionManager, productRepository) as T // ⬅️ Inyección de ProductRepository
             }
             throw IllegalArgumentException("Unknown CheckoutViewModel class")
         }
     })
 
+    // CartViewModel se mantiene simple (sin inyección del repo)
     val cartViewModel: CartViewModel = viewModel()
+
+    val historyViewModel: HistoryViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(HistoryViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return HistoryViewModel(orderRepository, sessionManager) as T
+            }
+            throw IllegalArgumentException("Unknown HistoryViewModel class")
+        }
+    })
 
     // Chat VM (usa contexto + session)
     val chatViewModel: ChatViewModel = viewModel(factory = object : ViewModelProvider.Factory {
@@ -128,7 +149,7 @@ fun NavGraph(navController: NavHostController) {
         startDestination = Routes.WELCOME
     ) {
 
-        /* ------------------- WELCOME  ------------------- */
+        /* ------------------- WELCOME / LOGIN / REGISTER / APP HOST  ------------------- */
         composable("${Routes.WELCOME}?logout={logout}") { backStackEntry ->
             val logoutFlag = backStackEntry.arguments?.getString("logout") == "true"
             val snackbarHostState = remember { SnackbarHostState() }
@@ -153,7 +174,6 @@ fun NavGraph(navController: NavHostController) {
             }
         }
 
-        /* ------------------- LOGIN ------------------- */
         composable(Routes.LOGIN) {
             LoginScreen(
                 onLoginSuccess = {
@@ -170,7 +190,6 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        /* ------------------- REGISTER ------------------- */
         composable(Routes.REGISTER) {
             RegisterScreen(
                 onRegisteredSuccess = {
@@ -185,7 +204,6 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        /* ------------------- APP HOST ------------------- */
         composable(Routes.APP_HOST) {
             AppHostScreen(
                 authViewModel = authViewModel,
@@ -213,10 +231,19 @@ fun NavGraph(navController: NavHostController) {
                     checkoutViewModel.reset()
                     navController.navigate("${Routes.WELCOME}?logout=true") { popUpTo(0) }
                 },
-                // botón de soporte
-                onGoToSupport = { navController.navigate(Routes.CLIENT_SUPPORT) }
+                onGoToSupport = { navController.navigate(Routes.CLIENT_SUPPORT) },
+                onGoToHistory = { navController.navigate(Routes.CLIENT_ORDER_HISTORY) }
             )
         }
+
+        composable(Routes.CLIENT_ORDER_HISTORY) {
+            OrderHistoryScreen(
+                onNavigateBack = { navController.popBackStack() },
+                viewModel = historyViewModel,
+                isAdminView = false
+            )
+        }
+
 
         /* ------------------- STOCK (Admin) ------------------- */
         composable(Routes.STOCK_MANAGER_HOME) {
@@ -228,10 +255,19 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate("${Routes.WELCOME}?logout=true") { popUpTo(0) }
                 },
                 viewModel = storeViewModel,
-                // NUEVO: lista de chats (clientes)
-                onGoToSupport = { navController.navigate(Routes.STOCK_CHAT_LIST) }
+                onGoToSupport = { navController.navigate(Routes.STOCK_CHAT_LIST) },
+                onGoToSalesHistory = { navController.navigate(Routes.STOCK_SALES_HISTORY) }
             )
         }
+
+        composable(Routes.STOCK_SALES_HISTORY) {
+            OrderHistoryScreen(
+                onNavigateBack = { navController.popBackStack() },
+                viewModel = historyViewModel,
+                isAdminView = true
+            )
+        }
+
 
         /* ------------------- DELIVERY ------------------- */
         composable(Routes.DELIVERY_HOME) {
@@ -246,7 +282,7 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        /* ------------------- CARRITO ------------------- */
+        /* ------------------- CARRITO / CHAT  ------------------- */
         composable(Routes.CART) {
             CartScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -255,12 +291,9 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        /* ======================= CHAT ======================= */
-
-        // Chat de soporte del CLIENTE (cliente ↔ stock)
         composable(Routes.CLIENT_SUPPORT) {
             LaunchedEffect(Unit) {
-                chatViewModel.openConversation("admin@stock.com")
+                chatViewModel.ensureSupportPeerForClient()
             }
             ChatSupportScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -268,7 +301,6 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        // Lista de conversaciones para STOCK (admin)
         composable(Routes.STOCK_CHAT_LIST) {
             StockChatListScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -279,7 +311,6 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        // Chat específico para STOCK (admin) con un cliente
         composable(
             route = "${Routes.STOCK_CHAT}?peerEmail={peerEmail}",
             arguments = listOf(

@@ -7,6 +7,9 @@ interface OrderDao {
 
     @Query("SELECT * FROM orders ORDER BY id DESC")
     suspend fun getAll(): List<OrderEntity>
+    //  Órdenes por cliente (Historial de Compras)
+    @Query("SELECT * FROM orders WHERE customerEmail = :email ORDER BY timestamp DESC")
+    suspend fun getByCustomerEmail(email: String): List<OrderEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(order: OrderEntity): Long

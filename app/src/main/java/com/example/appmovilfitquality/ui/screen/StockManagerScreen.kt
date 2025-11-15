@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.appmovilfitquality.data.local.ProductEntity
 import com.example.appmovilfitquality.ui.components.GradientBackground
@@ -31,7 +33,8 @@ import java.util.Locale
 fun StockManagerScreen(
     onLogout: () -> Unit,
     viewModel: StoreViewModel,
-    onGoToSupport: () -> Unit = {}
+    onGoToSupport: () -> Unit = {},
+    onGoToSalesHistory: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
@@ -41,9 +44,10 @@ fun StockManagerScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Gestión de Stock (Admin)") },
+                    title = { Text("Gestión de Stock (Admin)", color = Color.White) },
                     actions = {
-                        TextButton(onClick = onGoToSupport) { Text("Soporte") }
+                        TextButton(onClick = onGoToSalesHistory) { Text("Ventas", color = Color.White) }
+                        TextButton(onClick = onGoToSupport) { Text("Soporte", color = Color.White) }
                         Button(onClick = onLogout) { Text("Cerrar Sesión") }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -102,7 +106,7 @@ fun StockManagerScreen(
     }
 }
 
-/* ---------------- Lista ---------------- */
+/* ---------------- Lista Admin ---------------- */
 
 @Composable
 private fun ProductListAdmin(
@@ -128,6 +132,7 @@ private fun ProductListAdmin(
                         Text(product.name, fontWeight = FontWeight.Bold)
                         Text(product.description, style = MaterialTheme.typography.bodySmall)
                         Text(formatter.format(product.price), color = MaterialTheme.colorScheme.primary)
+                        Text("Stock: ${product.stock}", style = MaterialTheme.typography.labelMedium)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         IconButton(onClick = { onEdit(product) }) {
@@ -143,7 +148,7 @@ private fun ProductListAdmin(
     }
 }
 
-/* ------------- Diálogo producto ------------- */
+/* ------------- Diálogo producto (con Stock) ------------- */
 
 @Composable
 private fun ProductDialog(
@@ -154,6 +159,7 @@ private fun ProductDialog(
     var name by remember { mutableStateOf(product?.name ?: "") }
     var description by remember { mutableStateOf(product?.description ?: "") }
     var price by remember { mutableStateOf(product?.price?.toString() ?: "") }
+    var stock by remember { mutableStateOf(product?.stock?.toString() ?: "0") }
     var imageResName by remember { mutableStateOf(product?.imageResourceName ?: "") }
     var imageUri by remember { mutableStateOf(product?.imageUri) }
 
@@ -183,11 +189,13 @@ private fun ProductDialog(
         confirmButton = {
             Button(onClick = {
                 val parsedPrice = price.toDoubleOrNull() ?: 0.0
+                val parsedStock = stock.toIntOrNull() ?: 0
                 val newProduct = ProductEntity(
                     id = product?.id ?: 0,
                     name = name.trim(),
                     description = description.trim(),
                     price = parsedPrice,
+                    stock = parsedStock,
                     imageResourceName = imageResName.ifBlank { null },
                     imageUri = imageUri
                 )
@@ -200,7 +208,23 @@ private fun ProductDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre") })
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Descripción") })
-                OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Precio (CLP)") })
+
+                // Campo Precio
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { price = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Precio (CLP)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                // Campo Stock
+                OutlinedTextField(
+                    value = stock,
+                    onValueChange = { stock = it.filter { c -> c.isDigit() } },
+                    label = { Text("Stock (Unidades)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
                 OutlinedTextField(
                     value = imageResName,
                     onValueChange = { imageResName = it },

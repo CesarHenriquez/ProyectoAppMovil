@@ -3,9 +3,10 @@ package com.example.appmovilfitquality.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.appmovilfitquality.data.local.OrderEntity
-import com.example.appmovilfitquality.data.repository.AuthRepository
-import com.example.appmovilfitquality.data.repository.DeliveryRepository
 import com.example.appmovilfitquality.data.localstore.SessionManager
+import com.example.appmovilfitquality.data.repository.AuthRepository
+import com.example.appmovilfitquality.data.repository.OrderRepository
+import com.example.appmovilfitquality.data.repository.ProductRepository // ⬅️ Importación de ProductRepository
 import com.example.appmovilfitquality.domain.model.CartItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,9 +21,10 @@ data class CheckoutUiState(
 )
 
 class CheckoutViewModel(
-    private val deliveryRepo: DeliveryRepository,
+    private val orderRepo: OrderRepository,
     private val authRepo: AuthRepository,
-    private val session: SessionManager
+    private val session: SessionManager,
+    private val productRepo: ProductRepository
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(CheckoutUiState())
@@ -32,7 +34,8 @@ class CheckoutViewModel(
         _ui.value = CheckoutUiState()
     }
 
-    // Crea OrderEntity desde el carrito + dirección y lo guarda.
+    // Procesa la compra: valida stock, lo reduce, y luego persiste la orden.
+
     fun placeOrderFromCart(items: List<CartItem>, shippingAddress: String) {
         viewModelScope.launch {
             if (items.isEmpty()) {
@@ -59,23 +62,32 @@ class CheckoutViewModel(
                     return@launch
                 }
 
-                val summary = items.joinToString(", ") { "${it.product.name} x${it.quantity}" }
+                //  VALIDACIÓN Y REDUCCIÓN DE STOCK
+                // Si falla, el repositorio retorna false y no se realiza la compra
+                val stockReduced = productRepo.tryReduceStock(items)
+                if (!stockReduced) {
+                    _ui.value = CheckoutUiState(error = "Stock insuficiente. Por favor, revise las cantidades en su carrito.")
+                    // Se retorna para detener la transacción
+                    return@launch
+                }
+
+                //  Si el stock fue reducido con éxito, procedemos a guardar la Orden.
                 val total = items.sumOf { it.subtotal }
 
-                val order = OrderEntity(
+
+                val orderEntity = OrderEntity(
                     customerName  = user.name,
                     customerEmail = user.email,
                     customerPhone = user.phone,
                     shippingAddress = shippingAddress.trim(),
-                    productSummary = summary,
                     totalCLP = total
                 )
 
-                deliveryRepo.placeOrder(order)
+                orderRepo.placeOrder(orderEntity, items)
                 _ui.value = CheckoutUiState(success = true)
 
             } catch (e: Exception) {
-                _ui.value = CheckoutUiState(error = "No se pudo completar la compra.")
+                _ui.value = CheckoutUiState(error = "No se pudo completar la compra: Error de conexión o base de datos.")
             }
         }
     }

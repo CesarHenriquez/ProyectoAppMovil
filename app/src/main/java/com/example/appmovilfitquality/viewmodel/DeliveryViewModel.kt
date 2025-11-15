@@ -3,7 +3,7 @@ package com.example.appmovilfitquality.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.appmovilfitquality.data.local.OrderEntity
-import com.example.appmovilfitquality.data.repository.DeliveryRepository
+import com.example.appmovilfitquality.data.repository.OrderRepository // ⬅️ Usamos OrderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +17,7 @@ data class DeliveryUiState(
 )
 
 class DeliveryViewModel(
-    private val repo: DeliveryRepository
+    private val repo: OrderRepository // ⬅️ Inyección del OrderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeliveryUiState(isLoading = true))
@@ -27,11 +27,14 @@ class DeliveryViewModel(
         refresh()
     }
 
+    //Carga todas las OrderEntity (útil para el Delivery que solo ve las entregas).
+
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, lastMessage = null)
             try {
-                val list = repo.getOrders()
+
+                val list = repo.getOrdersForDelivery()
                 _uiState.value = DeliveryUiState(orders = list, isLoading = false)
             } catch (e: Exception) {
                 _uiState.value = DeliveryUiState(isLoading = false, error = "No fue posible cargar los pedidos.")
@@ -44,7 +47,7 @@ class DeliveryViewModel(
         viewModelScope.launch {
             try {
                 repo.saveDeliveryProof(orderId, proofUri)
-                val list = repo.getOrders()
+                val list = repo.getOrdersForDelivery() // Recarga
                 _uiState.value = DeliveryUiState(
                     orders = list,
                     isLoading = false,

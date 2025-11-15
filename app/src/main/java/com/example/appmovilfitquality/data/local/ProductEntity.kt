@@ -10,6 +10,7 @@ data class ProductEntity(
     val name: String,
     val description: String,
     val price: Double,
+    val stock: Int = 0, // Cantidad de stock disponible
     val imageResourceName: String? = null,
     val imageUri: String? = null
 )

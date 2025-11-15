@@ -9,6 +9,9 @@ interface ProductDao {
     @Query("SELECT * FROM products ORDER BY id ASC")
     fun getAllProducts(): Flow<List<ProductEntity>>
 
+    @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
+    suspend fun getProductById(id: Int): ProductEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProduct(product: ProductEntity)
 

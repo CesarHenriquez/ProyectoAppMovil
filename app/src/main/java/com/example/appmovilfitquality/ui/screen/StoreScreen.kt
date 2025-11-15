@@ -1,5 +1,6 @@
 package com.example.appmovilfitquality.ui.screen
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,10 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.appmovilfitquality.data.local.ProductEntity
+import com.example.appmovilfitquality.ui.components.CameraCaptureRow
 import com.example.appmovilfitquality.ui.components.DeleteFromGalleryButton
 import com.example.appmovilfitquality.ui.components.GradientBackground
 import com.example.appmovilfitquality.viewmodel.CartViewModel
 import com.example.appmovilfitquality.viewmodel.StoreViewModel
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -33,6 +36,7 @@ import java.util.Locale
 fun StoreScreen(
     onGoToCart: () -> Unit,
     onGoToSupport: () -> Unit,
+    onGoToHistory: () -> Unit,
     viewModel: StoreViewModel,
     cartViewModel: CartViewModel,
     onLogout: () -> Unit = {}
@@ -41,18 +45,21 @@ fun StoreScreen(
     var showReviewDialog by remember { mutableStateOf(false) }
     var selectedProduct by remember { mutableStateOf<ProductEntity?>(null) }
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     GradientBackground {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("FitQuality Store") },
+                    title = { Text("FitQuality Store", color = Color.White) },
                     actions = {
-                        // Botón Soporte que abre el chat
-                        TextButton(onClick = onGoToSupport) { Text("Soporte") }
+                        TextButton(onClick = onGoToHistory) { Text("Historial", color = Color.White) }
+                        TextButton(onClick = onGoToSupport) { Text("Soporte", color = Color.White) }
                         IconButton(onClick = onGoToCart) {
-                            Icon(Icons.Filled.ShoppingCart, contentDescription = "Ver carrito")
+                            Icon(Icons.Filled.ShoppingCart, contentDescription = "Ver carrito", tint = Color.White)
                         }
-                        TextButton(onClick = onLogout) { Text("Logout") }
+                        TextButton(onClick = onLogout) { Text("Logout", color = Color.White) }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
                 )
@@ -63,7 +70,7 @@ fun StoreScreen(
                 Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
@@ -77,7 +84,18 @@ fun StoreScreen(
                         items(uiState.products, key = { it.id }) { product ->
                             ProductCard(
                                 product = product,
-                                onAddToCart = { cartViewModel.addToCart(product) },
+                                //  Lógica de validación de stock y Toast
+                                onAddToCart = { productEntity ->
+                                    scope.launch {
+                                        val result = cartViewModel.tryAddToCart(productEntity)
+                                        if (!result.success) {
+                                            Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            // Mensaje de éxito si se añade
+                                            Toast.makeText(context, "${productEntity.name} añadido al carrito.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
                                 onReview = {
                                     selectedProduct = product
                                     showReviewDialog = true
@@ -92,7 +110,6 @@ fun StoreScreen(
                         productId = selectedProduct!!.id,
                         onDismiss = { showReviewDialog = false },
                         onSubmit = { _imageUri, _comment ->
-
                             showReviewDialog = false
                         }
                     )
@@ -105,12 +122,11 @@ fun StoreScreen(
 @Composable
 fun ProductCard(
     product: ProductEntity,
-    onAddToCart: () -> Unit,
+    onAddToCart: (ProductEntity) -> Unit, // Recibe ProductEntity
     onReview: () -> Unit
 ) {
     val context = LocalContext.current
     val formatter = remember { NumberFormat.getCurrencyInstance(Locale("es", "CL")) }
-
 
     val imageResId = remember(product.imageResourceName, product.imageUri) {
         if (product.imageUri.isNullOrBlank()) {
@@ -123,7 +139,7 @@ fun ProductCard(
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
 
-            // Foto real (URI) si existe
+            // (Lógica de imagen)
             if (!product.imageUri.isNullOrBlank()) {
                 AsyncImage(
                     model = product.imageUri,
@@ -135,8 +151,6 @@ fun ProductCard(
                     contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.height(12.dp))
-
-                //  Si no hay URI, intenta drawable por nombre
             } else if (imageResId != 0) {
                 Image(
                     painter = painterResource(id = imageResId),
@@ -148,8 +162,6 @@ fun ProductCard(
                     contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.height(12.dp))
-
-                // Placeholder si no hay nada
             } else {
                 Box(
                     modifier = Modifier
@@ -164,13 +176,21 @@ fun ProductCard(
                 Spacer(Modifier.height(12.dp))
             }
 
+
             Text(product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(product.description, style = MaterialTheme.typography.bodySmall)
+
+            // ⬅️ Mostrar stock
+            Text("Stock: ${product.stock} unidades", style = MaterialTheme.typography.labelMedium, color = if (product.stock > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error)
+
             Text(formatter.format(product.price), color = MaterialTheme.colorScheme.primary)
 
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAddToCart) { Text("Agregar al carrito") }
+                // ⬅️ Habilitar botón solo si hay stock
+                Button(onClick = { onAddToCart(product) }, enabled = product.stock > 0) {
+                    Text(if (product.stock > 0) "Agregar al carrito" else "Agotado")
+                }
                 OutlinedButton(onClick = onReview) { Text("Reseñar") }
             }
         }
@@ -209,7 +229,7 @@ fun ReviewDialog(
                 OutlinedTextField(value = comment, onValueChange = { comment = it }, label = { Text("Comentario") })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 
-                    com.example.appmovilfitquality.ui.components.CameraCaptureRow { uriStr -> imageUri = uriStr }
+                    CameraCaptureRow { uriStr -> imageUri = uriStr }
                 }
                 Text(if (imageUri != null) "Imagen seleccionada " else "Sin imagen")
             }

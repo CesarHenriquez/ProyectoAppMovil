@@ -15,8 +15,9 @@ data class OrderEntity(
     val shippingAddress: String,
 
 
-    val productSummary: String,
+
     val totalCLP: Double,
+    val timestamp: Long = System.currentTimeMillis(), //Fecha de la orden
 
 
     val proofImageUri: String? = null,

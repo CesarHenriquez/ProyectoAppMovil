@@ -17,7 +17,7 @@ import com.example.appmovilfitquality.viewmodel.DeliveryViewModel
 import java.text.NumberFormat
 import java.util.Locale
 
-@Composable private fun Loading() { Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text("Cargando pedidos…", color = Color.White) } }
+@Composable private fun Loading() { Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { CircularProgressIndicator(color = Color.White); Spacer(Modifier.height(12.dp)); Text("Cargando pedidos…", color = Color.White) } }
 @Composable private fun Error(msg: String) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("ERROR: $msg", color = MaterialTheme.colorScheme.error) } }
 @Composable private fun Empty() { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No hay pedidos asignados.", color = Color.White) } }
 
@@ -43,7 +43,7 @@ fun DeliveryScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
-                    title = { Text("Transportista (Delivery)") },
+                    title = { Text("Transportista (Delivery)", color = Color.White) },
                     actions = { Button(onClick = onLogout) { Text("Logout") } },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
                 )
@@ -96,14 +96,17 @@ private fun DeliveryList(
         items(orders, key = { it.id }) { order ->
             Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                    Text(order.customerName, style = MaterialTheme.typography.titleMedium)
+                    // Nota: 'productSummary' ha sido eliminado de OrderEntity, por lo que esta línea debe ser modificada si usabas ese campo.
+                    // Para Delivery, solo se muestra la información de contacto y el total.
+                    Text("Orden #${order.id}", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(4.dp))
+                    Text(order.customerName, style = MaterialTheme.typography.bodyMedium)
                     Text("Email: ${order.customerEmail}", style = MaterialTheme.typography.bodySmall)
                     Text("Teléfono: ${order.customerPhone}", style = MaterialTheme.typography.bodySmall)
                     Text("Dirección: ${order.shippingAddress}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
-                    Text("Pedido: ${order.productSummary}", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(4.dp))
+                    // Si deseas ver el resumen de la orden, necesitarías cargar Order con OrderItems (lo que hace el HistoryViewModel),
+                    // pero para simplificar la vista Delivery, mostramos el total y la prueba de entrega.
                     Text("Total: ${formatter.format(order.totalCLP)}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(10.dp))
 
