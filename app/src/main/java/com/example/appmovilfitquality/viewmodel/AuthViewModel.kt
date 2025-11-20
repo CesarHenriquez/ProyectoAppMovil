@@ -42,14 +42,14 @@ class AuthViewModel(
     private val _registrationSuccess = MutableStateFlow(false)
     val registrationSuccess: StateFlow<Boolean> = _registrationSuccess.asStateFlow()
 
-    // no restaura el rol desde DataStore al iniciar para evitar auto-login al abrir la app.
-
     fun logout() {
         viewModelScope.launch { session.clearSession() }
         _currentUserRole.value = UserRole.GUEST
     }
 
-    // Registro con validaciones y asignación de rol (NO auto-login).
+
+    //Valida todos los campos, verifica la existencia del email y asigna el rol seguro.
+
     fun validateAndRegister(
         name: String,
         email: String,
@@ -60,61 +60,65 @@ class AuthViewModel(
         viewModelScope.launch {
             _registrationSuccess.value = false
 
-            val allEmpty = name.isBlank() && email.isBlank() && phone.isBlank() && password.isBlank() && confirm.isBlank()
-            if (allEmpty) {
-                _registerValidationState.value = RegisterValidation(generalError = "Favor complete formulario")
-                return@launch
-            }
+            val nameTrimmed = name.trim()
+            val emailTrimmed = email.trim()
+            val phoneTrimmed = phone.trim()
 
-            val nameError = Validators.validateName(name.trim())
-            val emailError = Validators.validateEmail(email.trim())
-            val phoneError = Validators.validatePhone(phone.trim())
+            // 1. Validaciones por Campo (Usando Validators.kt)
+            val nameError = Validators.validateName(nameTrimmed)
+            val emailError = Validators.validateEmail(emailTrimmed)
+            val phoneError = Validators.validatePhone(phoneTrimmed)
             val passwordError = Validators.validatePassword(password)
-            val confirmError = if (confirm.isBlank() || confirm != password) "Las contraseñas no coinciden" else null
+
+            // 2. Validación de Coincidencia de Contraseñas
+            val confirmError = when {
+                confirm.isBlank() -> "Debe confirmar la contraseña"
+                confirm != password -> "Las contraseñas no coinciden"
+                else -> null
+            }
 
             var currentValidation = RegisterValidation(
                 nameError, emailError, phoneError, passwordError, confirmError
             )
 
+            // Si hay cualquier error de campo, publica el estado y detiene el registro
             if (listOf(nameError, emailError, phoneError, passwordError, confirmError).any { it != null }) {
                 _registerValidationState.value = currentValidation
                 return@launch
             }
 
+            // 3. Verificación de Exclusividad (BD)
             try {
-                if (repo.emailExists(email)) {
+                if (repo.emailExists(emailTrimmed)) {
                     _registerValidationState.value = currentValidation.copy(emailError = "El email ya está registrado")
                     return@launch
                 }
 
-                val assignedRole = UserRole.getRoleFromEmail(email.trim())
+                // 4. Asignación de Rol Seguro (Utiliza la lógica de UserRole.kt)
+                val assignedRole = UserRole.getRoleFromEmail(emailTrimmed)
 
                 repo.saveUser(
                     AuthRepository.User(
-                        name = name.trim(),
-                        email = email.trim(),
-                        phone = phone.trim(),
+                        name = nameTrimmed,
+                        email = emailTrimmed,
+                        phone = phoneTrimmed,
                         password = password,
                         role = assignedRole
                     )
                 )
 
-                // Éxito de registro: limpia errores y avisa al UI.
+                // Éxito: limpia errores y avisa al UI.
                 _registerValidationState.value = RegisterValidation()
-
-                //  NO guarda sesión ni cambia el rol aquí.
-                // El usuario deberá ir a Login y autenticarse con sus credenciales.
-
                 _registrationSuccess.value = true
 
-            } catch (_: Exception) {
-                currentValidation = currentValidation.copy(generalError = "Error de conexión: El sistema no está disponible.")
+            } catch (e: Exception) {
+                // Error de conexión/base de datos
+                currentValidation = currentValidation.copy(generalError = "Error al conectar: El sistema no está disponible. Detalles: ${e.message}")
                 _registerValidationState.value = currentValidation
             }
         }
     }
 
-    //Consumir el evento de éxito para no re-triggerear navegación.
     fun consumeRegistrationSuccess() {
         _registrationSuccess.value = false
     }
@@ -131,7 +135,7 @@ class AuthViewModel(
                 if (user == null) {
                     onResult(LoginResult.UserNotFound)
                 } else if (user.password == password) {
-                    session.saveSession(email.trim(), user.role) // persiste sesión SOLO al loguear
+                    session.saveSession(email.trim(), user.role)
                     _currentUserRole.value = user.role
                     onResult(LoginResult.Success(user.role))
                 } else {

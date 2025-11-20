@@ -6,13 +6,19 @@ enum class UserRole {
     DELIVERY,
     GUEST; // Rol por defecto
 
-    //  Asigna el rol basado en el dominio del email
     companion object {
+        // DEFINIR EMAILS AUTORIZADOS INTERNOS y EXCLUSIVOS
+        private const val AUTHORIZED_STOCK_EMAIL = "admin@stock.com"
+        private const val AUTHORIZED_DELIVERY_EMAIL = "cesar@delivery.com"
+
+        // Asigna el rol basado en emails preautorizados.
+        // Todos los demás emails se registran como cliente por defecto.
+
         fun getRoleFromEmail(email: String): UserRole {
-            return when {
-                email.endsWith("@stock.com", ignoreCase = true) -> STOCK
-                email.endsWith("@delivery.com", ignoreCase = true) -> DELIVERY
-                // Todos los demás correos son CLIENTES por defecto
+            return when (email.lowercase()) {
+                AUTHORIZED_STOCK_EMAIL -> STOCK
+                AUTHORIZED_DELIVERY_EMAIL -> DELIVERY
+                // Todos los demás correos son cliente
                 else -> CLIENTE
             }
         }

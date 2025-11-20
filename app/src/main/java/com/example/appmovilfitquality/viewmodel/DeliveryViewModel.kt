@@ -17,7 +17,7 @@ data class DeliveryUiState(
 )
 
 class DeliveryViewModel(
-    private val repo: OrderRepository // ⬅️ Inyección del OrderRepository
+    private val repo: OrderRepository // Inyección del OrderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeliveryUiState(isLoading = true))

@@ -32,7 +32,7 @@ class AudioRecorder(private val context: Context) {
         return Uri.fromFile(outputFile)
     }
 
-    // Devuelve el Uri del archivo si quedó OK, o null si no había nada grabando.
+    // Devuelve el Uri del archivo si quedó ok, o null si no había nada grabando.
     fun stop(): Uri? {
         val r = recorder ?: return null
         return try {

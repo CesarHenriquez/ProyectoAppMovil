@@ -29,6 +29,7 @@ import com.example.appmovilfitquality.ui.screen.DeliveryScreen
 import com.example.appmovilfitquality.ui.screen.HomeScreen
 import com.example.appmovilfitquality.ui.screen.LoginScreen
 import com.example.appmovilfitquality.ui.screen.OrderHistoryScreen
+import com.example.appmovilfitquality.ui.screen.ProfileScreen
 import com.example.appmovilfitquality.ui.screen.RegisterScreen
 import com.example.appmovilfitquality.ui.screen.StockChatListScreen
 import com.example.appmovilfitquality.ui.screen.StockChatScreen
@@ -40,6 +41,7 @@ import com.example.appmovilfitquality.viewmodel.ChatViewModel
 import com.example.appmovilfitquality.viewmodel.CheckoutViewModel
 import com.example.appmovilfitquality.viewmodel.DeliveryViewModel
 import com.example.appmovilfitquality.viewmodel.HistoryViewModel
+import com.example.appmovilfitquality.viewmodel.ProfileViewModel
 import com.example.appmovilfitquality.viewmodel.StoreViewModel
 
 object Routes {
@@ -60,7 +62,9 @@ object Routes {
     // Chat
     const val CLIENT_SUPPORT = "client_support"
     const val STOCK_CHAT_LIST = "stock_chat_list"
-    const val STOCK_CHAT = "stock_chat" // requiere arg ?peerEmail=
+    const val STOCK_CHAT = "stock_chat"
+
+    const val PROFILE = "profile" //  NUEVA RUTA
 }
 @Composable
 fun NavGraph(navController: NavHostController) {
@@ -141,6 +145,16 @@ fun NavGraph(navController: NavHostController) {
                 return ChatViewModel(context.applicationContext, sessionManager) as T
             }
             throw IllegalArgumentException("Unknown ChatViewModel class")
+        }
+    })
+    // Profile ViewModel
+    val profileViewModel: ProfileViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return ProfileViewModel(authRepository, sessionManager) as T
+            }
+            throw IllegalArgumentException("Unknown ProfileViewModel class")
         }
     })
 
@@ -232,7 +246,8 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate("${Routes.WELCOME}?logout=true") { popUpTo(0) }
                 },
                 onGoToSupport = { navController.navigate(Routes.CLIENT_SUPPORT) },
-                onGoToHistory = { navController.navigate(Routes.CLIENT_ORDER_HISTORY) }
+                onGoToHistory = { navController.navigate(Routes.CLIENT_ORDER_HISTORY) },
+                onGoToProfile = { navController.navigate(Routes.PROFILE) } // navegación a Perfil
             )
         }
 
@@ -329,6 +344,13 @@ fun NavGraph(navController: NavHostController) {
                 onNavigateBack = { navController.popBackStack() },
                 peerEmail = peerEmail,
                 viewModel = chatViewModel
+            )
+        }
+        /* ------------------- PERFIL ------------------- */
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onNavigateBack = { navController.popBackStack() },
+                viewModel = profileViewModel
             )
         }
     }

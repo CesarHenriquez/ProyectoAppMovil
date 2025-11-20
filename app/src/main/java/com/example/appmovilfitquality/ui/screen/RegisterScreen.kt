@@ -42,7 +42,7 @@ fun RegisterScreen(
     // Puerta de carga para registro exitoso
     var showGate by remember { mutableStateOf(false) }
 
-    // Al registrarse OK, muestra overlay 3s y luego va al login
+    // Al registrarse ok, muestra overlay 3s y luego va al login
     LaunchedEffect(registrationSuccess) {
         if (registrationSuccess) {
             showGate = true
@@ -56,6 +56,7 @@ fun RegisterScreen(
     fun submitRegister() {
         if (isSubmitting || showGate) return
         isSubmitting = true
+        // El ViewModel maneja todas las validaciones antes de guardar
         viewModel.validateAndRegister(
             name = name.trim(),
             email = email.trim(),
@@ -154,6 +155,7 @@ fun RegisterScreen(
                     )
                     Spacer(Modifier.height(8.dp))
 
+                    // Muestra error de confirmación si no coincide o está vacío.
                     OutlinedTextField(
                         value = confirm,
                         onValueChange = { confirm = it },

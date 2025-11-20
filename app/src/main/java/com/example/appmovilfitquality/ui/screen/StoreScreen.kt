@@ -30,6 +30,7 @@ import com.example.appmovilfitquality.viewmodel.StoreViewModel
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
+import androidx.compose.material.icons.filled.AccountCircle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +38,7 @@ fun StoreScreen(
     onGoToCart: () -> Unit,
     onGoToSupport: () -> Unit,
     onGoToHistory: () -> Unit,
+    onGoToProfile: () -> Unit, // Navegación a Perfil
     viewModel: StoreViewModel,
     cartViewModel: CartViewModel,
     onLogout: () -> Unit = {}
@@ -54,6 +56,10 @@ fun StoreScreen(
                 TopAppBar(
                     title = { Text("FitQuality Store", color = Color.White) },
                     actions = {
+                        // Botón de Perfil
+                        IconButton(onClick = onGoToProfile) {
+                            Icon(Icons.Filled.AccountCircle, contentDescription = "Perfil", tint = Color.White)
+                        }
                         TextButton(onClick = onGoToHistory) { Text("Historial", color = Color.White) }
                         TextButton(onClick = onGoToSupport) { Text("Soporte", color = Color.White) }
                         IconButton(onClick = onGoToCart) {
