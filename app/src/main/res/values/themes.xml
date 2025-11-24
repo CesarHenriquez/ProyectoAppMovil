@@ -2,4 +2,14 @@
 <resources>
 
     <style name="Theme.AppMovilFitQuality" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+
+        <item name="windowSplashScreenAnimatedIcon">@drawable/fitquality</item>
+
+        <item name="windowSplashScreenAnimationDuration">500</item>
+
+        <item name="postSplashScreenTheme">@style/Theme.AppMovilFitQuality</item>
+    </style>
 </resources>
