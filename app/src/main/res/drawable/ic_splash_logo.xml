@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:drawable="@android:color/transparent" />
+
+    <item
+        android:width="100dp"
+        android:height="100dp"
+        android:gravity="center"
+        android:top="16dp"
+        android:bottom="16dp"
+        android:left="16dp"
+        android:right="16dp">
+
+        <bitmap
+            android:src="@drawable/fitquality"
+            android:gravity="center" />
+    </item>
+</layer-list>
