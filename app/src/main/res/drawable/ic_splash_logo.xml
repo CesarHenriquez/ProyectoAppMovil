@@ -4,13 +4,11 @@
     <item android:drawable="@android:color/transparent" />
 
     <item
-        android:width="100dp"
-        android:height="100dp"
         android:gravity="center"
-        android:top="90dp"
-        android:bottom="90dp"
-        android:left="90dp"
-        android:right="90dp">
+        android:top="80dp"
+        android:bottom="80dp"
+        android:left="80dp"
+        android:right="80dp">
 
         <bitmap
             android:src="@drawable/fitquality"
