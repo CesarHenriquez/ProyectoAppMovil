@@ -7,10 +7,10 @@
         android:width="100dp"
         android:height="100dp"
         android:gravity="center"
-        android:top="64dp"
-        android:bottom="64dp"
-        android:left="64dp"
-        android:right="64dp">
+        android:top="90dp"
+        android:bottom="90dp"
+        android:left="90dp"
+        android:right="90dp">
 
         <bitmap
             android:src="@drawable/fitquality"
