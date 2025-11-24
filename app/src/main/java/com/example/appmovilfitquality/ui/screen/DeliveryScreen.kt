@@ -9,7 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.appmovilfitquality.data.local.OrderEntity
+import com.example.appmovilfitquality.data.repository.OrderRepository.OrderEntity // ⬅️ CORRECCIÓN CLAVE: Importar modelo intermedio
 import com.example.appmovilfitquality.ui.components.CameraCaptureRow
 import com.example.appmovilfitquality.ui.components.DeleteFromGalleryButton
 import com.example.appmovilfitquality.ui.components.GradientBackground
@@ -30,7 +30,7 @@ fun DeliveryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showProofDialog by remember { mutableStateOf(false) }
-    var selectedOrder by remember { mutableStateOf<OrderEntity?>(null) }
+    var selectedOrder by remember { mutableStateOf<OrderEntity?>(null) } // ✅ Usa OrderEntity
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.lastMessage) {

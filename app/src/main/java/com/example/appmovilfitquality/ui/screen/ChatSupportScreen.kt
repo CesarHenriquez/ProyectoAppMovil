@@ -17,11 +17,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.example.appmovilfitquality.viewmodel.ChatViewModel
-import com.example.appmovilfitquality.data.local.MessageEntity
+import com.example.appmovilfitquality.data.repository.ChatRepository.MessageEntity // ⬅️ CORRECCIÓN CLAVE
 import com.example.appmovilfitquality.ui.components.ChatBubble
+import com.example.appmovilfitquality.ui.components.CameraCaptureRow
 import com.example.appmovilfitquality.ui.components.GradientBackground
 import com.example.appmovilfitquality.ui.theme.GreenEnergy
 import com.example.appmovilfitquality.util.AudioRecorder
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +37,7 @@ fun ChatSupportScreen(
     var recorder by remember { mutableStateOf<AudioRecorder?>(null) }
     var recording by remember { mutableStateOf(false) }
 
-    //  Fija automáticamente el peer del soporte (primer usuario con rol STOCK)
+    // Fija automáticamente el peer del soporte (Admin)
     LaunchedEffect(Unit) {
         viewModel.ensureSupportPeerForClient()
     }
@@ -63,6 +65,18 @@ fun ChatSupportScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Botón para mandar foto (multimedia)
+                    CameraCaptureRow { uriStr ->
+                        viewModel.send(MessageEntity(
+                            senderEmail = ui.me,
+                            receiverEmail = ui.peer,
+                            text = null,
+                            audioUri = null,
+                            imageUri = uriStr,
+                            timestamp = System.currentTimeMillis()
+                        ))
+                    }
+
                     // Campo de texto
                     OutlinedTextField(
                         value = input,

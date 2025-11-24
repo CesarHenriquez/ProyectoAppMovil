@@ -1,5 +1,7 @@
 package com.example.appmovilfitquality.viewmodel
 
+
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.appmovilfitquality.data.localstore.SessionManager
@@ -10,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 
 data class RegisterValidation(
     val nameError: String? = null,
@@ -35,12 +39,31 @@ class AuthViewModel(
     private val _currentUserRole = MutableStateFlow<UserRole>(UserRole.GUEST)
     val currentUserRole: StateFlow<UserRole> = _currentUserRole.asStateFlow()
 
+
+    private val _isSessionLoaded = MutableStateFlow(false)
+    val isSessionLoaded: StateFlow<Boolean> = _isSessionLoaded.asStateFlow()
+
     private val _registerValidationState = MutableStateFlow(RegisterValidation())
     val registerValidationState: StateFlow<RegisterValidation> = _registerValidationState.asStateFlow()
 
-    // Señal de éxito real de registro (para navegar a Login)
     private val _registrationSuccess = MutableStateFlow(false)
     val registrationSuccess: StateFlow<Boolean> = _registrationSuccess.asStateFlow()
+
+
+    init {
+        viewModelScope.launch {
+            session.roleFlow.collect { role ->
+                if (role != null) {
+                    _currentUserRole.value = role
+                } else {
+                    _currentUserRole.value = UserRole.GUEST
+                }
+
+                _isSessionLoaded.value = true
+            }
+        }
+    }
+
 
     fun logout() {
         viewModelScope.launch { session.clearSession() }
@@ -48,7 +71,6 @@ class AuthViewModel(
     }
 
 
-    //Valida todos los campos, verifica la existencia del email y asigna el rol seguro.
 
     fun validateAndRegister(
         name: String,
@@ -64,13 +86,13 @@ class AuthViewModel(
             val emailTrimmed = email.trim()
             val phoneTrimmed = phone.trim()
 
-            // 1. Validaciones por Campo (Usando Validators.kt)
+
             val nameError = Validators.validateName(nameTrimmed)
             val emailError = Validators.validateEmail(emailTrimmed)
             val phoneError = Validators.validatePhone(phoneTrimmed)
             val passwordError = Validators.validatePassword(password)
 
-            // 2. Validación de Coincidencia de Contraseñas
+
             val confirmError = when {
                 confirm.isBlank() -> "Debe confirmar la contraseña"
                 confirm != password -> "Las contraseñas no coinciden"
@@ -81,40 +103,38 @@ class AuthViewModel(
                 nameError, emailError, phoneError, passwordError, confirmError
             )
 
-            // Si hay cualquier error de campo, publica el estado y detiene el registro
+
             if (listOf(nameError, emailError, phoneError, passwordError, confirmError).any { it != null }) {
                 _registerValidationState.value = currentValidation
                 return@launch
             }
 
-            // 3. Verificación de Exclusividad (BD)
+
             try {
-                if (repo.emailExists(emailTrimmed)) {
-                    _registerValidationState.value = currentValidation.copy(emailError = "El email ya está registrado")
-                    return@launch
-                }
 
-                // 4. Asignación de Rol Seguro (Utiliza la lógica de UserRole.kt)
-                val assignedRole = UserRole.getRoleFromEmail(emailTrimmed)
-
-                repo.saveUser(
+                repo.registerUser(
                     AuthRepository.User(
                         name = nameTrimmed,
                         email = emailTrimmed,
                         phone = phoneTrimmed,
                         password = password,
-                        role = assignedRole
+
+                        role = UserRole.CLIENTE
                     )
                 )
 
-                // Éxito: limpia errores y avisa al UI.
+
                 _registerValidationState.value = RegisterValidation()
                 _registrationSuccess.value = true
 
+            } catch (e: HttpException) {
+
+                _registerValidationState.value = currentValidation.copy(emailError = "Error ${e.code()}: El email ya está registrado o hay un conflicto en el servidor.")
+            } catch (e: IOException) {
+
+                _registerValidationState.value = currentValidation.copy(generalError = "Error de red: Imposible conectar con el microservicio de registro.")
             } catch (e: Exception) {
-                // Error de conexión/base de datos
-                currentValidation = currentValidation.copy(generalError = "Error al conectar: El sistema no está disponible. Detalles: ${e.message}")
-                _registerValidationState.value = currentValidation
+                _registerValidationState.value = currentValidation.copy(generalError = "Error al registrar: ${e.message}")
             }
         }
     }
@@ -124,24 +144,33 @@ class AuthViewModel(
     }
 
 
+
     fun login(email: String, password: String, onResult: (LoginResult) -> Unit) {
         viewModelScope.launch {
-            if (email.isBlank() || password.isBlank()) {
+
+
+            val cleanedEmail = email.trim()
+            val cleanedPassword = password.trim()
+
+            if (cleanedEmail.isBlank() || cleanedPassword.isBlank()) {
                 onResult(LoginResult.WrongPassword)
                 return@launch
             }
             try {
-                val user = repo.getUserByEmail(email)
-                if (user == null) {
-                    onResult(LoginResult.UserNotFound)
-                } else if (user.password == password) {
-                    session.saveSession(email.trim(), user.role)
-                    _currentUserRole.value = user.role
-                    onResult(LoginResult.Success(user.role))
-                } else {
-                    onResult(LoginResult.WrongPassword)
-                }
-            } catch (_: Exception) {
+
+                val user = repo.login(cleanedEmail, cleanedPassword)
+
+
+                _currentUserRole.value = user.role
+                onResult(LoginResult.Success(user.role))
+
+            } catch (e: HttpException) {
+
+                onResult(LoginResult.WrongPassword)
+            } catch (e: IOException) {
+
+                onResult(LoginResult.WrongPassword)
+            } catch (e: Exception) {
                 onResult(LoginResult.WrongPassword)
             }
         }

@@ -22,7 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.appmovilfitquality.data.local.ProductEntity
+import com.example.appmovilfitquality.domain.model.Product
+import com.example.appmovilfitquality.data.repository.ProductRepository.ProductEntity
 import com.example.appmovilfitquality.ui.components.GradientBackground
 import com.example.appmovilfitquality.viewmodel.StoreViewModel
 import java.text.NumberFormat
@@ -36,9 +37,12 @@ fun StockManagerScreen(
     onGoToSupport: () -> Unit = {},
     onGoToSalesHistory: () -> Unit
 ) {
+    // uiState.products ahora es List<Product> (Dominio)
     val uiState by viewModel.uiState.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
-    var editingProduct by remember { mutableStateOf<ProductEntity?>(null) }
+
+    // Convertimos el producto seleccionado a ProductEntity para que ProductDialog compile
+    var editingProductEntity by remember { mutableStateOf<ProductEntity?>(null) }
 
     GradientBackground {
         Scaffold(
@@ -55,7 +59,7 @@ fun StockManagerScreen(
             },
             floatingActionButton = {
                 FloatingActionButton(onClick = {
-                    editingProduct = null
+                    editingProductEntity = null
                     showDialog = true
                 }) {
                     Icon(Icons.Default.Add, contentDescription = "Agregar producto")
@@ -82,22 +86,31 @@ fun StockManagerScreen(
                 } else {
                     ProductListAdmin(
                         products = uiState.products,
-                        onEdit = {
-                            editingProduct = it
+                        onEdit = { product ->
+
+                            editingProductEntity = ProductEntity(
+                                id = product.id, name = product.name, description = product.description, price = product.price, stock = product.stock, imageResourceName = product.imageResourceName
+                            )
                             showDialog = true
                         },
-                        onDelete = { viewModel.deleteProduct(it) }
+                        onDelete = { product ->
+                            // El ViewModel espera ProductEntity, lo convertimos
+                            viewModel.deleteProduct(ProductEntity(
+                                id = product.id, name = product.name, description = product.description, price = product.price, stock = product.stock, imageResourceName = product.imageResourceName
+                            ))
+                        }
                     )
                 }
             }
 
             if (showDialog) {
                 ProductDialog(
-                    product = editingProduct,
+                    product = editingProductEntity,
                     onDismiss = { showDialog = false },
-                    onSave = { product ->
-                        if (editingProduct == null) viewModel.addProduct(product)
-                        else viewModel.updateProduct(product.copy(id = editingProduct!!.id))
+                    onSave = { productEntity ->
+                        // El ProductDialog retorna ProductEntity, que el VM puede usar directamente.
+                        if (editingProductEntity == null) viewModel.addProduct(productEntity)
+                        else viewModel.updateProduct(productEntity.copy(id = editingProductEntity!!.id))
                         showDialog = false
                     }
                 )
@@ -110,9 +123,9 @@ fun StockManagerScreen(
 
 @Composable
 private fun ProductListAdmin(
-    products: List<ProductEntity>,
-    onEdit: (ProductEntity) -> Unit,
-    onDelete: (ProductEntity) -> Unit
+    products: List<Product>,
+    onEdit: (Product) -> Unit,
+    onDelete: (Product) -> Unit
 ) {
     val formatter = remember { NumberFormat.getCurrencyInstance(Locale("es", "CL")) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -135,12 +148,10 @@ private fun ProductListAdmin(
                         Text("Stock: ${product.stock}", style = MaterialTheme.typography.labelMedium)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconButton(onClick = { onEdit(product) }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar")
-                        }
-                        IconButton(onClick = { onDelete(product) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Eliminar")
-                        }
+                        IconButton(onClick = { onEdit(product) }) // Pasa Product
+                        { Icon(Icons.Default.Edit, contentDescription = "Editar") }
+                        IconButton(onClick = { onDelete(product) }) // Pasa Product
+                        { Icon(Icons.Default.Delete, contentDescription = "Eliminar") }
                     }
                 }
             }
@@ -149,6 +160,7 @@ private fun ProductListAdmin(
 }
 
 /* ------------- Diálogo producto (con Stock) ------------- */
+
 
 @Composable
 private fun ProductDialog(

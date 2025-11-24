@@ -5,10 +5,19 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.CircularProgressIndicator // ⬇️ Agregado para el spinner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState // ⬇️ Agregado para leer flows
+import androidx.compose.runtime.getValue // ⬇️ Agregado para leer flows
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -17,11 +26,14 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.appmovilfitquality.data.local.AppDataBase
 import com.example.appmovilfitquality.data.localstore.SessionManager
+import com.example.appmovilfitquality.data.remote.ApiService
+import com.example.appmovilfitquality.data.remote.RetrofitClient
 import com.example.appmovilfitquality.data.repository.AuthRepository
+import com.example.appmovilfitquality.data.repository.ChatRepository
 import com.example.appmovilfitquality.data.repository.OrderRepository
 import com.example.appmovilfitquality.data.repository.ProductRepository
+import com.example.appmovilfitquality.domain.model.UserRole
 import com.example.appmovilfitquality.ui.screen.AppHostScreen
 import com.example.appmovilfitquality.ui.screen.CartScreen
 import com.example.appmovilfitquality.ui.screen.ChatSupportScreen
@@ -35,6 +47,7 @@ import com.example.appmovilfitquality.ui.screen.StockChatListScreen
 import com.example.appmovilfitquality.ui.screen.StockChatScreen
 import com.example.appmovilfitquality.ui.screen.StockManagerScreen
 import com.example.appmovilfitquality.ui.screen.StoreScreen
+import com.example.appmovilfitquality.ui.theme.GreenEnergy
 import com.example.appmovilfitquality.viewmodel.AuthViewModel
 import com.example.appmovilfitquality.viewmodel.CartViewModel
 import com.example.appmovilfitquality.viewmodel.ChatViewModel
@@ -64,25 +77,32 @@ object Routes {
     const val STOCK_CHAT_LIST = "stock_chat_list"
     const val STOCK_CHAT = "stock_chat"
 
-    const val PROFILE = "profile" //  NUEVA RUTA
+    const val PROFILE = "profile"
 }
 @Composable
 fun NavGraph(navController: NavHostController) {
 
     val context = LocalContext.current
 
-    // Infra compartida
-    val appDatabase = remember { AppDataBase.getDatabase(context) }
+
     val sessionManager = remember { SessionManager(context) }
 
-    val authRepository = remember { AuthRepository(appDatabase.userDao()) }
-    val productRepository = remember { ProductRepository(appDatabase.productDao()) }
 
-    val orderRepository = remember {
-        OrderRepository(appDatabase.orderDao(), appDatabase.orderItemDao())
+    val apiService: ApiService = remember {
+        RetrofitClient.createApiService(sessionManager)
     }
 
-    // ViewModels con Factory
+
+    val authRepository = remember { AuthRepository(apiService, sessionManager) }
+    val productRepository = remember { ProductRepository(apiService) }
+
+
+    val orderRepository = remember { OrderRepository(apiService,  authRepository) }
+
+
+    val chatRepository = remember { ChatRepository() } // Simulación local
+
+
     val authViewModel: AuthViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
@@ -113,41 +133,42 @@ fun NavGraph(navController: NavHostController) {
         }
     })
 
-    // CheckoutViewModel ahora usa ProductRepository
     val checkoutViewModel: CheckoutViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(CheckoutViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return CheckoutViewModel(orderRepository, authRepository, sessionManager, productRepository) as T // ⬅️ Inyección de ProductRepository
+                return CheckoutViewModel(orderRepository, authRepository, sessionManager, productRepository) as T
             }
             throw IllegalArgumentException("Unknown CheckoutViewModel class")
         }
     })
 
-    // CartViewModel se mantiene simple (sin inyección del repo)
     val cartViewModel: CartViewModel = viewModel()
+
 
     val historyViewModel: HistoryViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HistoryViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return HistoryViewModel(orderRepository, sessionManager) as T
+                return HistoryViewModel(orderRepository, sessionManager, authRepository) as T
             }
             throw IllegalArgumentException("Unknown HistoryViewModel class")
         }
     })
 
-    // Chat VM (usa contexto + session)
+
+
     val chatViewModel: ChatViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return ChatViewModel(context.applicationContext, sessionManager) as T
+                return ChatViewModel(chatRepository, sessionManager) as T
             }
             throw IllegalArgumentException("Unknown ChatViewModel class")
         }
     })
-    // Profile ViewModel
+
+
     val profileViewModel: ProfileViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
@@ -158,9 +179,30 @@ fun NavGraph(navController: NavHostController) {
         }
     })
 
+
+    val isSessionLoaded by authViewModel.isSessionLoaded.collectAsState()
+    val userRole by authViewModel.currentUserRole.collectAsState()
+
+
+    if (!isSessionLoaded) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = GreenEnergy)
+        }
+        return
+    }
+
+
+    val startRoute = if (userRole == UserRole.GUEST) Routes.WELCOME else Routes.APP_HOST
+
+
     NavHost(
         navController = navController,
-        startDestination = Routes.WELCOME
+        startDestination = startRoute
     ) {
 
         /* ------------------- WELCOME / LOGIN / REGISTER / APP HOST  ------------------- */
@@ -247,7 +289,7 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onGoToSupport = { navController.navigate(Routes.CLIENT_SUPPORT) },
                 onGoToHistory = { navController.navigate(Routes.CLIENT_ORDER_HISTORY) },
-                onGoToProfile = { navController.navigate(Routes.PROFILE) } // navegación a Perfil
+                onGoToProfile = { navController.navigate(Routes.PROFILE) }
             )
         }
 
@@ -270,6 +312,7 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate("${Routes.WELCOME}?logout=true") { popUpTo(0) }
                 },
                 viewModel = storeViewModel,
+
                 onGoToSupport = { navController.navigate(Routes.STOCK_CHAT_LIST) },
                 onGoToSalesHistory = { navController.navigate(Routes.STOCK_SALES_HISTORY) }
             )
@@ -297,7 +340,7 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
-        /* ------------------- CARRITO / CHAT  ------------------- */
+        /* ------------------- CARRITO / CHAT / PERFIL ------------------- */
         composable(Routes.CART) {
             CartScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -306,6 +349,7 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
+        // CHAT PRIVADO (CLIENTE ↔ ADMIN)
         composable(Routes.CLIENT_SUPPORT) {
             LaunchedEffect(Unit) {
                 chatViewModel.ensureSupportPeerForClient()
@@ -316,6 +360,7 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
+        // Lista de chats privados para STOCK (Admin)
         composable(Routes.STOCK_CHAT_LIST) {
             StockChatListScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -346,7 +391,7 @@ fun NavGraph(navController: NavHostController) {
                 viewModel = chatViewModel
             )
         }
-        /* ------------------- PERFIL ------------------- */
+
         composable(Routes.PROFILE) {
             ProfileScreen(
                 onNavigateBack = { navController.popBackStack() },

@@ -32,7 +32,7 @@ import java.util.Locale
 fun OrderHistoryScreen(
     onNavigateBack: () -> Unit,
     viewModel: HistoryViewModel,
-    isAdminView: Boolean // true para Historial de Ventas (Admin), false para Compras (Cliente)
+    isAdminView: Boolean
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val title = if (isAdminView) "Historial de Ventas" else "Historial de Compras"
@@ -64,6 +64,7 @@ fun OrderHistoryScreen(
             ) {
                 when {
                     uiState.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    // El error se dispara si el ID es nulo/cero o si hay un 403/404 de la API
                     uiState.error != null -> Text("Error: ${uiState.error}", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center))
                     uiState.orders.isEmpty() -> Text("No hay historial para mostrar.", color = Color.White, modifier = Modifier.align(Alignment.Center))
                     else -> OrderList(uiState.orders, isAdminView)
@@ -75,8 +76,13 @@ fun OrderHistoryScreen(
 
 @Composable
 private fun OrderList(orders: List<Order>, isAdminView: Boolean) {
+
+
+    val validOrders = orders.filter { it.id > 0 }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        items(orders, key = { it.id }) { order ->
+        // Usamos la lista validOrders
+        items(validOrders, key = { it.id }) { order ->
             OrderCard(order, isAdminView)
         }
     }
@@ -149,7 +155,8 @@ private fun OrderCard(order: Order, isAdminView: Boolean) {
 
             // Listado de Ítems
             Text("Productos:", fontWeight = FontWeight.SemiBold)
-            order.items.forEach { item ->
+            // Aseguramos que los items de la orden tengan un Key
+            order.items.filter { it.productId > 0 }.forEach { item ->
                 OrderItemRow(item, formatter)
             }
         }

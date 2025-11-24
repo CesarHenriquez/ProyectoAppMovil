@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.appmovilfitquality.data.local.MessageEntity
+import com.example.appmovilfitquality.data.repository.ChatRepository.MessageEntity // ⬅️ CORREGIDO: Importar modelo intermedio
 import com.example.appmovilfitquality.ui.components.GradientBackground
 import com.example.appmovilfitquality.ui.components.ChatBubble
 import com.example.appmovilfitquality.ui.theme.GreenEnergy
@@ -123,7 +123,7 @@ fun StockChatScreen(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(ui.messages, key = { it.id }) { msg: MessageEntity ->
+                    items(ui.messages, key = { it.id }) { msg: MessageEntity -> // ⬅️ CORREGIDO
                         ChatBubble(
                             isMine = msg.senderEmail == ui.me,
                             entity = msg,

@@ -70,11 +70,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // Room (SQLite) - runtime y extensiones KTX
-    implementation("androidx.room:room-runtime:2.6.1")    // <-- NUEVO
-    implementation("androidx.room:room-ktx:2.6.1")        // <-- NUEVO
+    //implementation("androidx.room:room-runtime:2.6.1")    // <-- NUEVO
+    //implementation("androidx.room:room-ktx:2.6.1")        // <-- NUEVO
 
     // Compilador de Room vía KSP
-    ksp("androidx.room:room-compiler:2.6.1")   // ← KSP          // <-- NUEVO
+    //ksp("androidx.room:room-compiler:2.6.1")   // ← KSP          // <-- NUEVO
 
     //cargar imagenes con compose
     implementation("io.coil-kt:coil-compose:2.7.0")

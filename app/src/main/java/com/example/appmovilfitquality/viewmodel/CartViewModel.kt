@@ -1,9 +1,8 @@
 package com.example.appmovilfitquality.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.example.appmovilfitquality.data.local.ProductEntity
 import com.example.appmovilfitquality.domain.model.CartItem
-import com.example.appmovilfitquality.domain.model.Product
+import com.example.appmovilfitquality.domain.model.Product // ⬅️ Usamos Product
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +15,6 @@ data class StockResult(
 )
 
 
-// CartViewModel se mantiene simple, sin inyecciones extra.
 class CartViewModel : ViewModel() {
 
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
@@ -25,23 +23,10 @@ class CartViewModel : ViewModel() {
     private val _cartTotal = MutableStateFlow(0.0)
     val cartTotal: StateFlow<Double> = _cartTotal.asStateFlow()
 
-    // Mapear ProductEntity (Room) -> Product (dominio)
-    private fun ProductEntity.toDomain(): Product =
-        Product(
-            id = this.id,
-            name = this.name,
-            description = this.description,
-            price = this.price,
-            imageResourceName = this.imageResourceName ?: ""
-        )
 
-    // Intenta añadir 1 unidad al carrito, validando el stock disponible. Retorna StockResult para que la vista muestre un mensaje si es necesario
+    suspend fun tryAddToCart(product: Product): StockResult {
 
-
-    suspend fun tryAddToCart(productEntity: ProductEntity): StockResult {
-        val product = productEntity.toDomain()
-
-        val currentStock = productEntity.stock
+        val currentStock = product.stock // ⬅️ Accedemos al stock directamente
         val currentQuantityInCart = _cartItems.value.find { it.product.id == product.id }?.quantity ?: 0
         val requestedQuantity = 1
 
@@ -50,7 +35,6 @@ class CartViewModel : ViewModel() {
         }
 
         // VALIDACIÓN DE STOCK
-        // Bloquear si la nueva cantidad excede el stock total
         if (currentQuantityInCart + requestedQuantity > currentStock) {
             val available = currentStock - currentQuantityInCart
             return StockResult(

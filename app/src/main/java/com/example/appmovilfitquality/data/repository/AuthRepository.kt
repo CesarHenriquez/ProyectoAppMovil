@@ -1,83 +1,110 @@
 package com.example.appmovilfitquality.data.repository
 
-import com.example.appmovilfitquality.data.local.UserDao
-import com.example.appmovilfitquality.data.local.UserEntity
+
+import com.example.appmovilfitquality.data.dto.RolDto
+import com.example.appmovilfitquality.data.dto.UserCredentialsDto
+import com.example.appmovilfitquality.data.dto.UserDto
+import com.example.appmovilfitquality.data.remote.ApiService
 import com.example.appmovilfitquality.domain.model.UserRole
+import com.example.appmovilfitquality.data.localstore.SessionManager
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filter
 
 
-class AuthRepository(private val userDao: UserDao) {
-
+class AuthRepository(
+    private val api: ApiService,
+    private val sessionManager: SessionManager
+) {
 
     data class User(
         val name: String,
         val email: String,
         val phone: String,
         val password: String,
-        val role: UserRole
+        val role: UserRole,
+        val token: String? = null
     )
 
 
-    private fun UserEntity.toDomainModel(): User =
-        User(
+
+    private fun UserDto.toDomainModel(password: String = "", token: String? = null): User {
+
+        val roleName = this.rol?.nombre ?: UserRole.CLIENTE.name
+        return User(
             name = this.name,
             email = this.email,
-            phone = this.phone,
-            password = this.password,
-            role = UserRole.valueOf(this.role)
+            phone = this.phone ?: "",
+            password = password,
+            role = UserRole.valueOf(roleName),
+            token = token
         )
-    //  Función auxiliar para convertir a Entity
-    private fun User.toEntity(): UserEntity =
-        UserEntity(
-            name = this.name,
-            email = this.email,
-            password = this.password,
-            phone = this.phone,
-            role = this.role.name
-        )
-
-
-    // Intenta registrar. Retorna true si el email ya existe.
-    suspend fun emailExists(email: String): Boolean {
-        return userDao.getUserByEmail(email) != null
     }
 
-    // Guarda un nuevo usuario.
-    suspend fun saveUser(user: User) {
-        val entity = UserEntity(
+
+
+    suspend fun registerUser(user: User): User {
+        val credentials = UserCredentialsDto(
+            email = user.email,
+            clave = user.password,
+            nickname = user.name
+        )
+        val responseDto = api.register(user = credentials)
+        return responseDto.toDomainModel(password = user.password)
+    }
+
+    suspend fun login(email: String, password: String): User {
+        val credentials = UserCredentialsDto(
+            email = email.trim(),
+            clave = password.trim(),
+            nickname = null
+        )
+        val response = api.login(credentials = credentials)
+
+        val roleName = response.user.rol?.nombre ?: UserRole.CLIENTE.name
+        val userRole = UserRole.valueOf(roleName)
+
+
+        sessionManager.saveSession(response.user.id, response.user.email, userRole, response.token)
+
+        return response.user.toDomainModel(password = password, token = response.token)
+    }
+
+
+    suspend fun getCurrentUserId(): Long? {
+        return sessionManager.userIdFlow
+            .filter { it != null && it > 0L }
+            .first()
+    }
+
+    suspend fun getUserByEmail(email: String): User {
+        val userDto = api.getUserByEmail(email = email)
+        val currentToken = sessionManager.tokenFlow.first()
+        return userDto.toDomainModel(password = "", token = currentToken)
+    }
+
+    suspend fun updateProfile(user: User) {
+        val userId = getCurrentUserId()
+            ?: throw IllegalStateException("ID de usuario no encontrado en la sesión.")
+
+
+        val userDto = UserDto(
+            id = userId.toInt(),
             name = user.name,
             email = user.email,
-            password = user.password,
             phone = user.phone,
-            role = user.role.name // Guarda el enum como String
+
+            rol = RolDto(nombre = user.role.name)
         )
-        userDao.insertUser(entity)
+        api.updateProfile(id = userId, userDto = userDto)
+        sessionManager.updateSessionRole(user.role)
     }
 
-    // Obtiene el usuario para login y retorna el modelo de Dominio.
-    suspend fun getUserByEmail(email: String): User? {
-        return userDao.getUserByEmail(email)?.toDomainModel()
-    }
-    // Actualiza el perfil del usuario (nombre, teléfono, etc.)
-    suspend fun update(user: User) {
-        val existingEntity = userDao.getUserByEmail(user.email)
-        if (existingEntity != null) {
-            // Se actualizan los campos editables, manteniendo el ID y la contraseña original.
-            val updatedEntity = existingEntity.copy(
-                name = user.name,
-                phone = user.phone,
-                // Mantiene la contraseña original para que solo se cambie con updatePassword
-                role = user.role.name
-            )
-            userDao.update(updatedEntity)
-        }
-    }
-
-    // Actualiza solo la contraseña
     suspend fun updatePassword(email: String, newPassword: String) {
-        val existingEntity = userDao.getUserByEmail(email)
-        if (existingEntity != null) {
-            val updatedEntity = existingEntity.copy(password = newPassword)
-            userDao.update(updatedEntity)
-        }
+        val requestBody = mapOf("nuevaClave" to newPassword.trim())
+        api.updatePassword(email = email.trim(), request = requestBody)
+    }
+
+    suspend fun clearSession() {
+        sessionManager.clearSession()
     }
 }

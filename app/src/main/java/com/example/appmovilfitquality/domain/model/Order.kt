@@ -11,6 +11,7 @@ data class OrderItem(
 }
 data class Order(
     val id: Int,
+    val customerId: Int,
     val customerName: String,
     val customerEmail: String,
     val customerPhone: String,
@@ -19,5 +20,5 @@ data class Order(
     val timestamp: Long,
     val proofImageUri: String? = null,
     val delivered: Boolean = false,
-    val items: List<OrderItem> //  Lista de items de la orden
+    val items: List<OrderItem>
 )

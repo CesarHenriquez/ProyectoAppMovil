@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 
 data class ProfileUiState(
     val isLoading: Boolean = true,
@@ -52,7 +54,7 @@ class ProfileViewModel(
             var sessionEmail: String? = null
 
             try {
-                // 1. Intenta leer el email de la sesión DataStore
+
                 sessionEmail = sessionManager.emailFlow.first()
 
                 if (sessionEmail.isNullOrBlank()) {
@@ -60,7 +62,7 @@ class ProfileViewModel(
                     return@launch
                 }
 
-                // 2. Busca el usuario en Room con el email obtenido
+
                 val user = authRepo.getUserByEmail(sessionEmail)
 
                 if (user != null) {
@@ -75,23 +77,26 @@ class ProfileViewModel(
                         )
                     }
                 } else {
-                    _uiState.update { it.copy(isLoading = false, error = "Usuario ${sessionEmail} no encontrado en la base de datos.") }
+                    _uiState.update { it.copy(isLoading = false, error = "Usuario no encontrado en la base de datos.") }
                 }
 
+            } catch (e: HttpException) {
+                _uiState.update { it.copy(isLoading = false, error = "Error ${e.code()}: No se pudo cargar el perfil.") }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isLoading = false, error = "Error de red: Imposible conectar con el microservicio.") }
             } catch (e: Exception) {
-                // Captura cualquier fallo de IO o lectura asíncrona.
-                _uiState.update { it.copy(isLoading = false, error = "Fallo crítico al cargar la sesión: ${e.message}") }
+                _uiState.update { it.copy(isLoading = false, error = "Fallo al cargar el perfil: ${e.message}") }
             }
         }
     }
 
-    // Actualiza los datos de perfil (nombre y teléfono)
+
     fun updateProfile(name: String, phone: String) {
         viewModelScope.launch {
             val email = _uiState.value.email
             if (email.isBlank()) return@launch
 
-            // Validaciones rápidas
+
             val nameError = Validators.validateName(name.trim())
             val phoneError = Validators.validatePhone(phone.trim())
 
@@ -101,23 +106,29 @@ class ProfileViewModel(
             }
 
             try {
+
                 val existingUser = authRepo.getUserByEmail(email)
                 if (existingUser != null) {
                     val updatedUser = existingUser.copy(
                         name = name.trim(),
                         phone = phone.trim()
                     )
-                    authRepo.update(updatedUser)
-                    loadProfile() // Recargar para actualizar la UI
+                    authRepo.updateProfile(updatedUser)
+                    loadProfile()
                     _uiState.update { it.copy(message = "Perfil actualizado con éxito.") }
                 }
+            } catch (e: HttpException) {
+                _uiState.update { it.copy(error = "Error ${e.code()}: No se pudo guardar el perfil.") }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(error = "Error de red al guardar el perfil.") }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Error al guardar los cambios.") }
             }
         }
     }
 
-    // Flujo de cambio de contraseña
+    // Flujo de cambio de contraseña (PUT /users/password)
+    // ⬇️ CORRECCIÓN: Cambio de contraseña usando la nueva API ⬇️
     suspend fun changePassword(current: String, new: String, confirm: String) {
         _passwordValidationState.value = PasswordChangeValidation()
         val email = _uiState.value.email
@@ -125,7 +136,6 @@ class ProfileViewModel(
         val newPasswordError = Validators.validatePassword(new)
         val confirmPasswordError = if (confirm != new) "Las nuevas contraseñas no coinciden" else null
 
-        // 1. Validar formato de la nueva contraseña
         if (newPasswordError != null || confirmPasswordError != null) {
             _passwordValidationState.value = PasswordChangeValidation(
                 newPasswordError = newPasswordError,
@@ -135,20 +145,26 @@ class ProfileViewModel(
         }
 
         try {
-            val user = authRepo.getUserByEmail(email)
+            // 1. **AUTENTICAR PRIMERO** (Simulamos una verificación de credenciales con la API de Login)
+            // Esto asegura que 'current' password sea correcta.
+            authRepo.login(email, current)
 
-            // 2. Verificar contraseña actual
-            if (user?.password != current) {
-                _passwordValidationState.value = PasswordChangeValidation(
-                    currentPasswordError = "Contraseña actual incorrecta."
-                )
-                return
-            }
-
-            // 3. Actualizar contraseña
+            // 2. Si la autenticación es exitosa, ACTUALIZAR la clave
             authRepo.updatePassword(email, new)
             _passwordValidationState.value = PasswordChangeValidation(success = true)
+            _uiState.update { it.copy(message = "Contraseña cambiada con éxito.") }
 
+        } catch (e: HttpException) {
+            // ⬇️ CRÍTICO: El error 401 del login (clave actual incorrecta) se maneja aquí ⬇️
+            if (e.code() == 401) {
+                _passwordValidationState.value = PasswordChangeValidation(
+                    currentPasswordError = "Contraseña actual incorrecta o email no encontrado."
+                )
+            } else {
+                _passwordValidationState.value = PasswordChangeValidation(
+                    generalError = "Error ${e.code()}: Fallo al actualizar la clave en el servidor."
+                )
+            }
         } catch (e: Exception) {
             _passwordValidationState.value = PasswordChangeValidation(
                 generalError = "Error al cambiar la contraseña."

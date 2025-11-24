@@ -18,29 +18,50 @@ class SessionManager(context: Context) {
     private val dataStore = appContext.sessionDataStore
 
     private object Keys {
+
+        val USER_ID: Preferences.Key<String> = stringPreferencesKey("user_id")
         val EMAIL: Preferences.Key<String> = stringPreferencesKey("email")
         val ROLE: Preferences.Key<String> = stringPreferencesKey("role")
+        val TOKEN: Preferences.Key<String> = stringPreferencesKey("auth_token")
     }
 
-    // Flujo del email de sesión (o null si no hay).
+
+    val userIdFlow: Flow<Long?> = dataStore.data.map { prefs ->
+        prefs[Keys.USER_ID]?.toLongOrNull()
+    }
+
+
     val emailFlow: Flow<String?> = dataStore.data.map { prefs -> prefs[Keys.EMAIL] }
 
-    // Flujo del rol persistido (o null si no hay).
+
     val roleFlow: Flow<UserRole?> = dataStore.data.map { prefs ->
         prefs[Keys.ROLE]?.let { saved ->
             runCatching { UserRole.valueOf(saved) }.getOrNull()
         }
     }
 
-    // Guarda email + rol.
-    suspend fun saveSession(email: String, role: UserRole) {
+
+    val tokenFlow: Flow<String?> = dataStore.data.map { prefs -> prefs[Keys.TOKEN] }
+
+
+    suspend fun saveSession(userId: Int, email: String, role: UserRole, token: String) {
         dataStore.edit { prefs ->
+
+            prefs[Keys.USER_ID] = userId.toString()
             prefs[Keys.EMAIL] = email
+            prefs[Keys.ROLE] = role.name
+            prefs[Keys.TOKEN] = token
+        }
+    }
+
+
+    suspend fun updateSessionRole(role: UserRole) {
+        dataStore.edit { prefs ->
             prefs[Keys.ROLE] = role.name
         }
     }
 
-    // Limpia la sesión.
+
     suspend fun clearSession() {
         dataStore.edit { it.clear() }
     }

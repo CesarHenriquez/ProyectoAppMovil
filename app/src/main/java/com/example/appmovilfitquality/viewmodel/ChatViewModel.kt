@@ -6,16 +6,16 @@ import android.media.MediaPlayer
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.appmovilfitquality.data.local.AppDataBase
-import com.example.appmovilfitquality.data.local.MessageEntity
 import com.example.appmovilfitquality.data.localstore.SessionManager
 import com.example.appmovilfitquality.data.repository.ChatRepository
+import com.example.appmovilfitquality.data.repository.ChatRepository.MessageEntity // ⬅️ Usamos MessageEntity del repositorio simulado
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+// Constante para el chat grupal
+private const val INTERNAL_GROUP_CHAT_ID = "internal_coordination_group"
 
 // Estado de la UI del chat
-
 data class ChatUi(
     val me: String = "",
     val peer: String = "",
@@ -25,17 +25,16 @@ data class ChatUi(
 )
 
 
-// ViewModel del Chat
-
+/**
+ * ViewModel del Chat, ahora usa ChatRepository simulado en memoria.
+ * NO USA Room.
+ */
 class ChatViewModel(
-    context: Context,
+    private val repo: ChatRepository, // ⬅️ Inyección del repositorio simulado
     private val session: SessionManager
 ) : ViewModel() {
 
-    private val db = AppDataBase.getDatabase(context)
-    private val dao = db.messageDao()
-    private val userDao = db.userDao() // para obtener el email del usuario STOCK
-    private val repo = ChatRepository(dao)
+    // NOTA: Se eliminan las referencias a db, dao, y userDao
 
     private val _ui = MutableStateFlow(ChatUi())
     val ui: StateFlow<ChatUi> = _ui.asStateFlow()
@@ -47,45 +46,45 @@ class ChatViewModel(
     private var player: MediaPlayer? = null
 
     init {
-        // Cargar email del usuario actual
+        // Cargar email del usuario actual desde DataStore
         viewModelScope.launch {
             session.emailFlow.collect { email ->
                 if (!email.isNullOrBlank()) {
                     _ui.update { it.copy(me = email) }
-                    observeCounterparts(email)
+                    // observeCounterparts(email) // Opcional en el flujo REST
                 }
             }
         }
     }
 
 
-    // Observa todas las contrapartes con las que he hablado
-
-    private fun observeCounterparts(me: String) {
-        viewModelScope.launch {
-            repo.counterparts(me).collect { list ->
-                _counterparts.value = list
+    // ⬅️ Lógica para el Chat Grupal de Coordinación (STOCK/DELIVERY)
+    fun openGroupChat() {
+        _ui.update { it.copy(
+            peer = INTERNAL_GROUP_CHAT_ID,
+            messages = emptyList(),
+            inputText = ""
+        ) }
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
+            // El repositorio simulado usa el ID del grupo como si fuera un "peer"
+            repo.conversation(_ui.value.me, INTERNAL_GROUP_CHAT_ID).collect { msgs ->
+                _ui.update { it.copy(messages = msgs) }
             }
         }
     }
 
-
-    // Fija automáticamente el peer (el primer STOCK registrado)
-
+    /**
+     * Fija automáticamente el peer del soporte (Chat Privado Cliente ↔ Admin).
+     */
     fun ensureSupportPeerForClient() {
-        viewModelScope.launch {
-            if (_ui.value.peer.isBlank()) {
-                val stockEmail = userDao.firstEmailByRole("STOCK")
-                if (!stockEmail.isNullOrBlank()) {
-                    _ui.update { it.copy(peer = stockEmail) }
-                }
-            }
-        }
+        // Asumimos el email del admin conocido para iniciar el chat de soporte
+        val stockEmail = "admin@stock.com"
+        openConversation(stockEmail)
     }
 
 
-    // Abre conversación con un peer
-
+    // Abre conversación con un peer (Chat Privado)
     fun openConversation(peer: String) {
         _ui.update { it.copy(peer = peer, messages = emptyList(), inputText = "") }
         messagesJob?.cancel()
@@ -96,29 +95,32 @@ class ChatViewModel(
         }
     }
 
-
     // Manejo del input
-
     fun setInput(text: String) {
         _ui.update { it.copy(inputText = text) }
     }
 
+    // Función auxiliar para enviar mensajes
+    private suspend fun sendMessage(message: MessageEntity) {
+        repo.send(message)
+    }
+
 
     // Envío de texto
-
     fun sendText() {
         val me = _ui.value.me
-        val peer = _ui.value.peer
+        val target = _ui.value.peer
         val body = _ui.value.inputText.trim()
-        if (me.isBlank() || peer.isBlank() || body.isBlank()) return
+        if (me.isBlank() || target.isBlank() || body.isBlank()) return
 
         viewModelScope.launch {
-            repo.send(
+            sendMessage(
                 MessageEntity(
                     senderEmail = me,
-                    receiverEmail = peer,
+                    receiverEmail = target,
                     text = body,
                     audioUri = null,
+                    imageUri = null,
                     timestamp = System.currentTimeMillis()
                 )
             )
@@ -128,28 +130,34 @@ class ChatViewModel(
 
 
     // Envío de audio
-
     fun sendAudio(uriString: String) {
         val me = _ui.value.me
-        val peer = _ui.value.peer
-        if (me.isBlank() || peer.isBlank()) return
+        val target = _ui.value.peer
+        if (me.isBlank() || target.isBlank()) return
 
         viewModelScope.launch {
-            repo.send(
+            sendMessage(
                 MessageEntity(
                     senderEmail = me,
-                    receiverEmail = peer,
+                    receiverEmail = target,
                     text = null,
                     audioUri = uriString,
+                    imageUri = null,
                     timestamp = System.currentTimeMillis()
                 )
             )
         }
     }
 
+    // Envío genérico (usado para enviar imágenes desde CameraCaptureRow)
+    fun send(message: MessageEntity) {
+        viewModelScope.launch {
+            sendMessage(message)
+        }
+    }
 
-    // Reproducir audio
 
+    // Reproducir audio (mantenido)
     fun playAudio(context: Context, uriString: String) {
         try {
             val uri = Uri.parse(uriString)
@@ -203,4 +211,3 @@ class ChatViewModel(
         super.onCleared()
     }
 }
-

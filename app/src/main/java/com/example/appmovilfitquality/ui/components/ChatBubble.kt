@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.appmovilfitquality.data.local.MessageEntity
+import com.example.appmovilfitquality.data.repository.ChatRepository.MessageEntity // ⬅️ CORRECCIÓN CLAVE: Nueva ubicación
 import com.example.appmovilfitquality.ui.theme.GreenEnergy
 
 

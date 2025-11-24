@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,8 +21,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import com.example.appmovilfitquality.data.local.ProductEntity
+
+import com.example.appmovilfitquality.domain.model.Product
+
 import com.example.appmovilfitquality.ui.components.CameraCaptureRow
 import com.example.appmovilfitquality.ui.components.DeleteFromGalleryButton
 import com.example.appmovilfitquality.ui.components.GradientBackground
@@ -30,7 +32,6 @@ import com.example.appmovilfitquality.viewmodel.StoreViewModel
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
-import androidx.compose.material.icons.filled.AccountCircle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,14 +39,18 @@ fun StoreScreen(
     onGoToCart: () -> Unit,
     onGoToSupport: () -> Unit,
     onGoToHistory: () -> Unit,
-    onGoToProfile: () -> Unit, // Navegación a Perfil
+    onGoToProfile: () -> Unit,
     viewModel: StoreViewModel,
     cartViewModel: CartViewModel,
     onLogout: () -> Unit = {}
 ) {
+    // uiState.products es List<Product> (Dominio)
     val uiState by viewModel.uiState.collectAsState()
     var showReviewDialog by remember { mutableStateOf(false) }
-    var selectedProduct by remember { mutableStateOf<ProductEntity?>(null) }
+
+    var selectedProduct by remember {
+        mutableStateOf<Product?>(null)
+    }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -87,18 +92,19 @@ fun StoreScreen(
                         contentPadding = PaddingValues(bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(uiState.products, key = { it.id }) { product ->
+
+                        val validProducts = uiState.products.filter { it.id > 0 }
+
+                        items(validProducts, key = { it.id }) { product ->
                             ProductCard(
                                 product = product,
-                                //  Lógica de validación de stock y Toast
-                                onAddToCart = { productEntity ->
+                                onAddToCart = { p ->
                                     scope.launch {
-                                        val result = cartViewModel.tryAddToCart(productEntity)
+                                        val result = cartViewModel.tryAddToCart(p)
                                         if (!result.success) {
                                             Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
                                         } else {
-                                            // Mensaje de éxito si se añade
-                                            Toast.makeText(context, "${productEntity.name} añadido al carrito.", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "${p.name} añadido al carrito.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 },
@@ -125,41 +131,38 @@ fun StoreScreen(
     }
 }
 
+
 @Composable
 fun ProductCard(
-    product: ProductEntity,
-    onAddToCart: (ProductEntity) -> Unit, // Recibe ProductEntity
+    product: Product,
+    onAddToCart: (Product) -> Unit,
     onReview: () -> Unit
 ) {
     val context = LocalContext.current
     val formatter = remember { NumberFormat.getCurrencyInstance(Locale("es", "CL")) }
 
-    val imageResId = remember(product.imageResourceName, product.imageUri) {
-        if (product.imageUri.isNullOrBlank()) {
-            product.imageResourceName?.let {
-                context.resources.getIdentifier(it, "drawable", context.packageName)
-            } ?: 0
-        } else 0
+
+
+    val localResourceName = product.imageUri?.substringBeforeLast(".")
+
+    val localImageResId = remember(localResourceName) {
+        if (!localResourceName.isNullOrBlank()) {
+
+            context.resources.getIdentifier(localResourceName, "drawable", context.packageName)
+        } else {
+            0
+        }
     }
+
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
 
-            // (Lógica de imagen)
-            if (!product.imageUri.isNullOrBlank()) {
-                AsyncImage(
-                    model = product.imageUri,
-                    contentDescription = product.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.height(12.dp))
-            } else if (imageResId != 0) {
+            val remoteImageUrl = product.imageUri
+
+            if (localImageResId != 0) {
                 Image(
-                    painter = painterResource(id = imageResId),
+                    painter = painterResource(id = localImageResId),
                     contentDescription = product.name,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -186,14 +189,12 @@ fun ProductCard(
             Text(product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(product.description, style = MaterialTheme.typography.bodySmall)
 
-            // ⬅️ Mostrar stock
-            Text("Stock: ${product.stock} unidades", style = MaterialTheme.typography.labelMedium, color = if (product.stock > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error)
+            Text("Stock: ${product.stock} unidades", style = MaterialTheme.typography.labelMedium, color = if (product.stock > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
 
             Text(formatter.format(product.price), color = MaterialTheme.colorScheme.primary)
 
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // ⬅️ Habilitar botón solo si hay stock
                 Button(onClick = { onAddToCart(product) }, enabled = product.stock > 0) {
                     Text(if (product.stock > 0) "Agregar al carrito" else "Agotado")
                 }
@@ -203,7 +204,7 @@ fun ProductCard(
     }
 }
 
-/* ----------------------------- Diálogo reseña ----------------------------- */
+// ... (El diálogo ReviewDialog se mantiene igual) ...
 
 @Composable
 fun ReviewDialog(
@@ -214,6 +215,7 @@ fun ReviewDialog(
     var comment by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<String?>(null) }
 
+    // ... (resto del cuerpo sin cambios)
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { Button(onClick = { onSubmit(imageUri, comment) }) { Text("Publicar") } },
