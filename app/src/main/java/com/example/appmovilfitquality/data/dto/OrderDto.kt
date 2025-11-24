@@ -16,14 +16,14 @@ data class OrderItemDto(
 
 
 data class OrderDto(
-    @SerializedName("venta_id")
+    @SerializedName("id")
     val id: Int,
     @SerializedName("usuarioId")
     val customerId: Long,
     @SerializedName("direccionId")
     val shippingAddressId: Long,
     @SerializedName("fecha")
-    val timestamp: Long,
+    val fecha: String? = null,
     @SerializedName("detalles")
     val items: List<OrderItemDto>,
 

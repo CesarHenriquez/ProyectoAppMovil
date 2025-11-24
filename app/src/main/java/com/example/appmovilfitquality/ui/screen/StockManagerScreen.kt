@@ -22,8 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.appmovilfitquality.data.repository.ProductRepository
 import com.example.appmovilfitquality.domain.model.Product
-import com.example.appmovilfitquality.data.repository.ProductRepository.ProductEntity
 import com.example.appmovilfitquality.ui.components.GradientBackground
 import com.example.appmovilfitquality.viewmodel.StoreViewModel
 import java.text.NumberFormat
@@ -42,7 +42,7 @@ fun StockManagerScreen(
     var showDialog by remember { mutableStateOf(false) }
 
     // Convertimos el producto seleccionado a ProductEntity para que ProductDialog compile
-    var editingProductEntity by remember { mutableStateOf<ProductEntity?>(null) }
+    var editingProductEntity by remember { mutableStateOf<ProductRepository.ProductEntity?>(null) }
 
     GradientBackground {
         Scaffold(
@@ -88,14 +88,14 @@ fun StockManagerScreen(
                         products = uiState.products,
                         onEdit = { product ->
 
-                            editingProductEntity = ProductEntity(
+                            editingProductEntity = ProductRepository.ProductEntity(
                                 id = product.id, name = product.name, description = product.description, price = product.price, stock = product.stock, imageResourceName = product.imageResourceName
                             )
                             showDialog = true
                         },
                         onDelete = { product ->
                             // El ViewModel espera ProductEntity, lo convertimos
-                            viewModel.deleteProduct(ProductEntity(
+                            viewModel.deleteProduct(ProductRepository.ProductEntity(
                                 id = product.id, name = product.name, description = product.description, price = product.price, stock = product.stock, imageResourceName = product.imageResourceName
                             ))
                         }
@@ -164,9 +164,9 @@ private fun ProductListAdmin(
 
 @Composable
 private fun ProductDialog(
-    product: ProductEntity?,
+    product: ProductRepository.ProductEntity?,
     onDismiss: () -> Unit,
-    onSave: (ProductEntity) -> Unit
+    onSave: (ProductRepository.ProductEntity) -> Unit
 ) {
     var name by remember { mutableStateOf(product?.name ?: "") }
     var description by remember { mutableStateOf(product?.description ?: "") }
@@ -202,7 +202,7 @@ private fun ProductDialog(
             Button(onClick = {
                 val parsedPrice = price.toDoubleOrNull() ?: 0.0
                 val parsedStock = stock.toIntOrNull() ?: 0
-                val newProduct = ProductEntity(
+                val newProduct = ProductRepository.ProductEntity(
                     id = product?.id ?: 0,
                     name = name.trim(),
                     description = description.trim(),

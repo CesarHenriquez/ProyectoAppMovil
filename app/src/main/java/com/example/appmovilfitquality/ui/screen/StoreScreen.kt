@@ -21,9 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
 import com.example.appmovilfitquality.domain.model.Product
-
 import com.example.appmovilfitquality.ui.components.CameraCaptureRow
 import com.example.appmovilfitquality.ui.components.DeleteFromGalleryButton
 import com.example.appmovilfitquality.ui.components.GradientBackground
@@ -44,13 +42,9 @@ fun StoreScreen(
     cartViewModel: CartViewModel,
     onLogout: () -> Unit = {}
 ) {
-    // uiState.products es List<Product> (Dominio)
     val uiState by viewModel.uiState.collectAsState()
     var showReviewDialog by remember { mutableStateOf(false) }
-
-    var selectedProduct by remember {
-        mutableStateOf<Product?>(null)
-    }
+    var selectedProduct by remember { mutableStateOf<Product?>(null) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -61,7 +55,6 @@ fun StoreScreen(
                 TopAppBar(
                     title = { Text("FitQuality Store", color = Color.White) },
                     actions = {
-                        // Botón de Perfil
                         IconButton(onClick = onGoToProfile) {
                             Icon(Icons.Filled.AccountCircle, contentDescription = "Perfil", tint = Color.White)
                         }
@@ -92,7 +85,7 @@ fun StoreScreen(
                         contentPadding = PaddingValues(bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-
+                        // Filtramos productos con ID válido para evitar errores
                         val validProducts = uiState.products.filter { it.id > 0 }
 
                         items(validProducts, key = { it.id }) { product ->
@@ -131,7 +124,6 @@ fun StoreScreen(
     }
 }
 
-
 @Composable
 fun ProductCard(
     product: Product,
@@ -141,24 +133,20 @@ fun ProductCard(
     val context = LocalContext.current
     val formatter = remember { NumberFormat.getCurrencyInstance(Locale("es", "CL")) }
 
-
-
-    val localResourceName = product.imageUri?.substringBeforeLast(".")
+    // Obtenemos el nombre limpio del modelo
+    val localResourceName = product.imageResourceName
 
     val localImageResId = remember(localResourceName) {
         if (!localResourceName.isNullOrBlank()) {
-
+            // Buscamos el ID del recurso en drawable
             context.resources.getIdentifier(localResourceName, "drawable", context.packageName)
         } else {
             0
         }
     }
 
-
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-
-            val remoteImageUrl = product.imageUri
 
             if (localImageResId != 0) {
                 Image(
@@ -180,11 +168,15 @@ fun ProductCard(
                         .background(Color(0xFF222222)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Sin imagen", color = Color.White.copy(alpha = 0.7f))
+                    // Si falla, muestra qué nombre estaba buscando
+                    Text(
+                        "Sin imagen (Busca: '${product.imageResourceName}')",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
             }
-
 
             Text(product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(product.description, style = MaterialTheme.typography.bodySmall)
@@ -204,8 +196,6 @@ fun ProductCard(
     }
 }
 
-// ... (El diálogo ReviewDialog se mantiene igual) ...
-
 @Composable
 fun ReviewDialog(
     productId: Int,
@@ -215,7 +205,6 @@ fun ReviewDialog(
     var comment by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<String?>(null) }
 
-    // ... (resto del cuerpo sin cambios)
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { Button(onClick = { onSubmit(imageUri, comment) }) { Text("Publicar") } },
@@ -236,7 +225,6 @@ fun ReviewDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = comment, onValueChange = { comment = it }, label = { Text("Comentario") })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-
                     CameraCaptureRow { uriStr -> imageUri = uriStr }
                 }
                 Text(if (imageUri != null) "Imagen seleccionada " else "Sin imagen")

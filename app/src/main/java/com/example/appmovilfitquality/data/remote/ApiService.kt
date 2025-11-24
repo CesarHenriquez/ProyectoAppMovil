@@ -61,7 +61,7 @@ interface ApiService {
 
 
     @GET
-    suspend fun getOrdersByCustomer(@Url url: String = "${VENTAS_URL}api/ventas/usuario/{id}", @Path("id") id: Long): List<OrderDto>
+    suspend fun getOrdersByCustomer(@Url url: String): List<OrderDto>
 
 
 

@@ -12,7 +12,7 @@ import kotlinx.coroutines.runBlocking
 
 object MicroserviceUrls {
 
-    private const val BASE_IP = "http://192.168.0.6"
+    private const val BASE_IP = "http://192.168.56.1"
 
 
     const val REGISTRO_USUARIO = "$BASE_IP:8020/"

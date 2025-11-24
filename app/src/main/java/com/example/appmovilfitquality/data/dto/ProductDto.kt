@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 
 data class ProductDto(
-    @SerializedName("producto_id")
+    @SerializedName("id")
     val id: Int = 0,
     @SerializedName("nombre")
     val name: String,
@@ -17,6 +17,6 @@ data class ProductDto(
     @SerializedName("stock")
     val stock: Int = 0,
 
-    @SerializedName("imageUri")
+    @SerializedName("imagenUri")
     val imageUri: String? = null
 )

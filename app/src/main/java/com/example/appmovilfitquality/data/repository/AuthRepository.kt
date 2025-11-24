@@ -10,7 +10,6 @@ import com.example.appmovilfitquality.data.localstore.SessionManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filter
 
-
 class AuthRepository(
     private val api: ApiService,
     private val sessionManager: SessionManager
@@ -25,22 +24,34 @@ class AuthRepository(
         val token: String? = null
     )
 
+    // ⬇️ NUEVA FUNCIÓN AUXILIAR: Mapeo seguro de String a Enum ⬇️
+    private fun mapToDomainRole(roleName: String?): UserRole {
+        return when (roleName?.uppercase()) {
+            "ADMINISTRADOR", "ADMIN" -> UserRole.STOCK // "ADMINISTRADOR" del backend es "STOCK" en la App
+            "DELIVERY" -> UserRole.DELIVERY
+            "CLIENTE" -> UserRole.CLIENTE
+            else -> UserRole.CLIENTE // Por defecto, si no coincide, es cliente
+        }
+    }
 
+    // --- Mapeo DTO <-> Dominio ---
 
     private fun UserDto.toDomainModel(password: String = "", token: String? = null): User {
+        // Usamos la función auxiliar segura
+        val roleNameString = this.rol?.nombre
+        val domainRole = mapToDomainRole(roleNameString)
 
-        val roleName = this.rol?.nombre ?: UserRole.CLIENTE.name
         return User(
-            name = this.name,
-            email = this.email,
+            name = this.name ?: "",
+            email = this.email ?: "",
             phone = this.phone ?: "",
             password = password,
-            role = UserRole.valueOf(roleName),
+            role = domainRole,
             token = token
         )
     }
 
-
+    // --- Funcionalidades ---
 
     suspend fun registerUser(user: User): User {
         val credentials = UserCredentialsDto(
@@ -58,17 +69,19 @@ class AuthRepository(
             clave = password.trim(),
             nickname = null
         )
+
+        // 1. Llamada a la API
         val response = api.login(credentials = credentials)
 
-        val roleName = response.user.rol?.nombre ?: UserRole.CLIENTE.name
-        val userRole = UserRole.valueOf(roleName)
+        // 2. Mapeo Seguro del Rol (Aquí es donde fallaba el Admin)
+        val roleNameString = response.user.rol?.nombre
+        val userRole = mapToDomainRole(roleNameString)
 
-
+        // 3. Guardar Sesión
         sessionManager.saveSession(response.user.id, response.user.email, userRole, response.token)
 
         return response.user.toDomainModel(password = password, token = response.token)
     }
-
 
     suspend fun getCurrentUserId(): Long? {
         return sessionManager.userIdFlow
@@ -86,13 +99,11 @@ class AuthRepository(
         val userId = getCurrentUserId()
             ?: throw IllegalStateException("ID de usuario no encontrado en la sesión.")
 
-
         val userDto = UserDto(
             id = userId.toInt(),
             name = user.name,
             email = user.email,
             phone = user.phone,
-
             rol = RolDto(nombre = user.role.name)
         )
         api.updateProfile(id = userId, userDto = userDto)
