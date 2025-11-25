@@ -27,7 +27,7 @@ class AuthRepositoryTest {
     @Before
     fun setUp() {
         apiService = mockk()
-        // relaxed = true para que no falle al llamar a saveSession (que no devuelve nada)
+
         sessionManager = mockk(relaxed = true)
 
         authRepository = AuthRepository(apiService, sessionManager)
@@ -74,7 +74,7 @@ class AuthRepositoryTest {
 
     @Test
     fun `login con rol CLIENTE se mantiene como CLIENTE`() = runBlocking {
-        // --- ARRANGE ---
+
         val email = "cliente@test.com"
 
         val fakeUserDto = UserDto(
@@ -85,13 +85,13 @@ class AuthRepositoryTest {
         )
         val fakeResponse = LoginResponseDto(token = "token_cliente", user = fakeUserDto)
 
-        // ⬇️ CORRECCIÓN AQUÍ: Usamos any() para ambos argumentos posicionales
+
         coEvery { apiService.login(any(), any()) } returns fakeResponse
 
-        // --- ACT ---
+
         val result = authRepository.login(email, "pass")
 
-        // --- ASSERT ---
+
         assertEquals(UserRole.CLIENTE, result.role)
 
         coVerify {
@@ -102,7 +102,7 @@ class AuthRepositoryTest {
 
     @Test
     fun `login con rol DELIVERY se mantiene como DELIVERY`() = runBlocking {
-        // --- ARRANGE ---
+
         val email = "delivery@test.com"
         val fakeUserDto = UserDto(
             id = 3,
@@ -115,10 +115,10 @@ class AuthRepositoryTest {
 
         coEvery { apiService.login(any(), any()) } returns fakeResponse
 
-        // --- ACT ---
+
         val result = authRepository.login(email, "pass")
 
-        // --- ASSERT ---
+
         assertEquals(UserRole.DELIVERY, result.role)
 
         println(" Test Delivery OK")
