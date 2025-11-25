@@ -19,8 +19,7 @@ class ProductRepository(private val api: ApiService) {
     )
 
     private fun ProductDto.toEntity(): ProductEntity {
-        // ⬇️ CORRECCIÓN: Usamos el nombre de la imagen que viene del servidor.
-        // .substringBeforeLast(".") asegura que si viene "cinturon_fit.jpg" o "cinturon_fit", funcione igual.
+
         val localResourceName = this.imageUri?.substringBeforeLast(".")
 
         return ProductEntity(
@@ -28,11 +27,11 @@ class ProductRepository(private val api: ApiService) {
             name = this.name,
             description = this.description,
             price = this.price,
-            // Si el stock viene nulo, ponemos 0
+
             stock = this.stock ?: 0,
             imageUri = this.imageUri,
 
-            // ⬇️ AQUÍ ESTABA EL ERROR: Antes era null, ahora asignamos el nombre correcto ⬇️
+
             imageResourceName = localResourceName
         )
     }

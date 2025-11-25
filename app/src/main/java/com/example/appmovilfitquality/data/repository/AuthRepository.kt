@@ -24,17 +24,17 @@ class AuthRepository(
         val token: String? = null
     )
 
-    // ⬇️ NUEVA FUNCIÓN AUXILIAR: Mapeo seguro de String a Enum ⬇️
+
     private fun mapToDomainRole(roleName: String?): UserRole {
         return when (roleName?.uppercase()) {
-            "ADMINISTRADOR", "ADMIN" -> UserRole.STOCK // "ADMINISTRADOR" del backend es "STOCK" en la App
+            "ADMINISTRADOR", "ADMIN" -> UserRole.STOCK
             "DELIVERY" -> UserRole.DELIVERY
             "CLIENTE" -> UserRole.CLIENTE
-            else -> UserRole.CLIENTE // Por defecto, si no coincide, es cliente
+            else -> UserRole.CLIENTE
         }
     }
 
-    // --- Mapeo DTO <-> Dominio ---
+
 
     private fun UserDto.toDomainModel(password: String = "", token: String? = null): User {
         // Usamos la función auxiliar segura
@@ -51,7 +51,7 @@ class AuthRepository(
         )
     }
 
-    // --- Funcionalidades ---
+
 
     suspend fun registerUser(user: User): User {
         val credentials = UserCredentialsDto(
@@ -70,14 +70,14 @@ class AuthRepository(
             nickname = null
         )
 
-        // 1. Llamada a la API
+
         val response = api.login(credentials = credentials)
 
-        // 2. Mapeo Seguro del Rol (Aquí es donde fallaba el Admin)
+
         val roleNameString = response.user.rol?.nombre
         val userRole = mapToDomainRole(roleNameString)
 
-        // 3. Guardar Sesión
+
         sessionManager.saveSession(response.user.id, response.user.email, userRole, response.token)
 
         return response.user.toDomainModel(password = password, token = response.token)

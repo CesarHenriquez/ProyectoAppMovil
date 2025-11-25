@@ -43,33 +43,33 @@ class AuthRepositoryTest {
             id = 1,
             name = "Admin Test",
             email = email,
-            // EL CASO CLAVE: El servidor devuelve "ADMINISTRADOR"
+
             rol = RolDto(id = 1, nombre = "ADMINISTRADOR")
         )
         val fakeResponse = LoginResponseDto(token = "token_admin", user = fakeUserDto)
 
-        // ⬇️ CORRECCIÓN AQUÍ: Pasamos any() para url Y para credentials
+
         coEvery {
             apiService.login(url = any(), credentials = any())
         } returns fakeResponse
 
-        // --- ACT ---
+
         val result = authRepository.login(email, password)
 
-        // --- ASSERT ---
-        // 1. Verificamos la transformación de rol
+
+
         assertEquals(UserRole.STOCK, result.role)
 
-        // 2. Verificamos persistencia correcta
+
         coVerify {
             sessionManager.saveSession(
                 userId = 1,
                 email = email,
-                role = UserRole.STOCK, // Se guardó como STOCK
+                role = UserRole.STOCK,
                 token = "token_admin"
             )
         }
-        println("✅ Test Admin OK")
+        println(" Test Admin OK")
     }
 
     @Test
@@ -97,7 +97,7 @@ class AuthRepositoryTest {
         coVerify {
             sessionManager.saveSession(userId = 2, email = email, role = UserRole.CLIENTE, token = "token_cliente")
         }
-        println("✅ Test Cliente OK")
+        println(" Test Cliente OK")
     }
 
     @Test
@@ -112,7 +112,7 @@ class AuthRepositoryTest {
         )
         val fakeResponse = LoginResponseDto(token = "token_delivery", user = fakeUserDto)
 
-        // ⬇️ CORRECCIÓN AQUÍ: Usamos any() para ambos argumentos
+
         coEvery { apiService.login(any(), any()) } returns fakeResponse
 
         // --- ACT ---
@@ -121,6 +121,6 @@ class AuthRepositoryTest {
         // --- ASSERT ---
         assertEquals(UserRole.DELIVERY, result.role)
 
-        println("✅ Test Delivery OK")
+        println(" Test Delivery OK")
     }
 }

@@ -23,7 +23,7 @@ class ValidatorsTest {
     // --- Pruebas de Password ---
     @Test
     fun `validatePassword retorna nulo con clave segura`() {
-        // Tiene mayúscula, número y largo suficiente
+
         val result = Validators.validatePassword("FitQuality2025")
         assertNull(result)
     }
@@ -31,8 +31,7 @@ class ValidatorsTest {
     @Test
     fun `validatePassword retorna error si es muy corta`() {
         val result = Validators.validatePassword("Ab1")
-        // El mensaje exacto puede variar según tu código, ajusta si es necesario
-        // Pero el resultado NO debe ser nulo
+
         assert(result != null)
     }
 

@@ -67,9 +67,7 @@ object RetrofitClient {
             .build()
     }
 
-    /**
-     * Función centralizada para crear la instancia de ApiService.
-     */
+
     fun createApiService(sessionManager: SessionManager): ApiService {
         val client = createOkHttpClient(sessionManager)
 
